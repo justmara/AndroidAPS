@@ -395,7 +395,7 @@
     <string name="bgi_shortname">-BGI</string>
     <string name="abs_insulin_shortname">НАДО</string>
     <string name="devslope_shortname">ЛИНОТКЛН</string>
-    <string name="nav_about">о приложении</string>
+    <string name="nav_about">О приложении</string>
     <string name="smscommunicator_missingsmspermission">отсутствует смс подтверждение</string>
     <string name="smscommunicator_missingphonestatepermission">Отсутствует разрешение телефона</string>
     <string name="xdripstatus_settings">Cтрока состояния xDrip (часы)</string>
