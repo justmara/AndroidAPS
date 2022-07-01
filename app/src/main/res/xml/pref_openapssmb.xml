@@ -35,6 +35,45 @@
 
         <SwitchPreference
             android:defaultValue="false"
+            android:key="@string/key_use_autoisf"
+            android:title="@string/openapsama_useautoisf" />
+
+        <SwitchPreference
+            android:defaultValue="false"
+            android:dependency="@string/key_use_autoisf"
+            android:key="@string/key_enableautoISF_with_COB"
+            android:summary="@string/enableautoISFwithcob_summary"
+            android:title="@string/enableautoISFwithcob" />
+
+        <SwitchPreference
+            android:defaultValue="false"
+            android:dependency="@string/key_use_autoisf"
+            android:key="@string/key_enable_postprandial_ISF_always"
+            android:summary="@string/enable_postprandial_ISF_always_summary"
+            android:title="@string/enable_postprandial_ISF_always" />
+
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="@string/key_a52_risk_enable"
+            android:title="@string/a52_risk_enable"
+            android:summary="@string/a52_risk_enable_summary" />
+
+        <info.nightscout.androidaps.utils.textValidator.ValidatingEditTextPreference
+            android:defaultValue="160"
+            android:dialogMessage="@string/halfbasalexercisetarget"
+            android:digits="0123456789"
+            android:inputType="number"
+            android:key="@string/key_openapssmb_half_basal_exercise_target"
+            android:maxLines="20"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="@string/halfbasalexercisetarget_summary"
+            validate:maxNumber="200"
+            validate:minNumber="110"
+            validate:testType="numericRange" />
+
+        <SwitchPreference
+            android:defaultValue="false"
             android:key="@string/key_use_smb"
             android:summary="@string/enablesmb_summary"
             android:title="@string/enablesmb" />
