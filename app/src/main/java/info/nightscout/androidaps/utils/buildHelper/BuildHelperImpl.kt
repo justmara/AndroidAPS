@@ -4,7 +4,7 @@ import info.nightscout.androidaps.BuildConfig
 import info.nightscout.androidaps.interfaces.Config
 import info.nightscout.androidaps.R
 import info.nightscout.androidaps.plugins.general.maintenance.PrefFileListProvider
-import info.nightscout.androidaps.utils.sharedPreferences.SP
+import info.nightscout.shared.sharedPreferences.SP
 import java.io.File
 
 class BuildHelperImpl constructor(
