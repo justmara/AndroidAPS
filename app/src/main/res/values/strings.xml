@@ -329,6 +329,11 @@
     <string name="openapsma_autosensdata_label">Autosens data</string>
     <string name="openapsma_scriptdebugdata_label">Script debug</string>
     <string name="openapsama_useautosens">Use Autosens feature</string>
+    <string name="a52_risk_enable">A52 risk enable</string>
+    <string name="a52_risk_enable_summary">Flag to disable Medtronic A52 error safety (should lead to more agressive bolusing)</string>
+    <string name="engineering_mode">Engineering mode</string>
+    <string name="engineering_mode_summary">Flag to enable engineering mode (UNSAFE)</string>
+    <string name="bypass_old_version_check_title">Skip checking for new version (not recommended)</string>
     <string name="refresheventsfromnightscout">Refresh from NS</string>
     <string name="deletefuturetreatments">Delete treatments in the future</string>
     <string name="actions_shortname">ACT</string>
@@ -601,6 +606,8 @@
     <string name="smbmaxminutes_summary">Max minutes of basal to limit SMB to</string>
     <string name="uamsmbmaxminutes">UAM SMB max minutes</string>
     <string name="uamsmbmaxminutes_summary">Max minutes of basal to limit SMB to for UAM</string>
+    <string name="halfbasalexercisetarget">Half basal exercise temp target</string>
+    <string name="halfbasalexercisetarget_summary">BG (mg/dl) temp target to half the basal need when exercising</string>
     <string name="key_carbsReqThreshold" translatable="false">carbsReqThreshold</string>
     <string name="carbsReqThreshold">Minimum Carbs Required For Suggestion</string>
     <string name="carbsReqThreshold_summary">Minimum grams of carbs to display a carbs suggestion alert. Carbs suggestions below this number will not trigger a notification.</string>
@@ -629,11 +636,14 @@
     <string name="key_enableSMB_with_COB" translatable="false">enableSMB_with_COB</string>
     <string name="key_enableSMB_with_temptarget" translatable="false">enableSMB_with_temptarget</string>
     <string name="key_enableSMB_after_carbs" translatable="false">enableSMB_after_carbs</string>
+    <string name="key_enableSMB_ignore" translatable="false">enableSMB_ignore</string>
     <string name="key_allowSMB_with_high_temptarget" translatable="false">enableSMB_with_high_temptarget</string>
     <string name="enablesmbalways">Enable SMB always</string>
     <string name="enablesmbalways_summary">Enable SMB always independently to boluses. Possible only with BG source with nice filtering of data like G5</string>
     <string name="enablesmbaftercarbs">Enable SMB after carbs</string>
     <string name="enablesmbaftercarbs_summary">Enable SMB for 6h after carbs, even with 0 COB. Possible only with BG source with nice filtering of data like G5</string>
+    <string name="enablesmbignore">Enable SMB disregarding BG source (UNSAFE)</string>
+    <string name="enablesmbaftercarbs_ignore">Enable SMB not caring about noisy BG source (UNSAFE)</string>
     <string name="enablesmbwithcob">Enable SMB with COB</string>
     <string name="enablesmbwithcob_summary">Enable SMB when there is COB active.</string>
     <string name="enablesmbwithtemptarget">Enable SMB with temp targets</string>
@@ -721,6 +731,8 @@
     <string name="maxvalueinpreferences">max value in preferences</string>
     <string name="hardlimit">hard limit</string>
     <string name="key_openapsama_useautosens" translatable="false">openapsama_useautosens</string>
+    <string name="key_a52_risk_enable" translatable="false">a52_risk_enable</string>
+    <string name="key_engineering_mode" translatable="false">engineering_mode</string>
     <string name="readstatusfailed">Read status failed</string>
     <string name="record_pump_site_change">Record pump site change</string>
     <string name="record_insulin_cartridge_change">Record insulin cartridge change</string>
@@ -893,6 +905,7 @@
 
     <string name="key_smbmaxminutes" translatable="false">smbmaxminutes</string>
     <string name="key_uamsmbmaxminutes" translatable="false">uamsmbmaxminutes</string>
+    <string name="key_openapssmb_half_basal_exercise_target" translatable="false">openapssmb_half_basal_exercise_target</string>
     <string name="dst_plugin_name" translatable="false">Daylight Saving time</string>
     <string name="dst_in_24h_warning">Daylight Saving time change in 24h or less</string>
     <string name="dst_loop_disabled_warning">Daylight Saving time change less than 3 hours ago - Closed loop disabled</string>

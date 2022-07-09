@@ -261,6 +261,11 @@
     <string name="openapsma_autosensdata_label">данные autosens</string>
     <string name="openapsma_scriptdebugdata_label">отладка скрипта</string>
     <string name="openapsama_useautosens">Пользоваться функцией Autosens</string>
+    <string name="a52_risk_enable">A52_risk_enable</string>
+    <string name="a52_risk_enable_summary">Отключить безопасности препятствующей ошибке Medtronic A52 (может привести к более агрессивным болюсам)</string>
+    <string name="engineering_mode">Инженерный режим</string>
+    <string name="engineering_mode_summary">Включить инженерный режим (НЕБЕЗОПАСНО)</string>
+    <string name="bypass_old_version_check_title">Не проверять наличие новой версии (не рекомендуется)</string>
     <string name="refresheventsfromnightscout">Обновить из NS</string>
     <string name="deletefuturetreatments">Удалить назначения из будущего</string>
     <string name="actions_shortname">ДЕЙСТВ</string>
@@ -487,6 +492,8 @@
     <string name="smbmaxminutes_summary">Верхний лимит минут базала на SMB</string>
     <string name="uamsmbmaxminutes">Максимум минут микроболюса SMB для непредвиденного приема пищи UAM</string>
     <string name="uamsmbmaxminutes_summary">Максимум минут базала ограничивающего микроболюсы SMB на непредвиденный прием пищи UAM</string>
+    <string name="halfbasalexercisetarget">Уменьшение вдвое базальной потребности при упражнении</string>
+    <string name="halfbasalexercisetarget_summary">Уровень ГК (мг/дл) временной цели, для которого потребности будет уменьшаться вдвое</string>
     <string name="carbsReqThreshold">Минимальный порог для напоминания о необходимых углеводах</string>
     <string name="carbsReqThreshold_summary">Минимум граммов для активации предложения углеводов. Предложения ниже этой величины не будут инициировать уведомление.</string>
     <string name="dexcomg5_xdripupload_title">Отправить данные СК на xDrip+</string>
@@ -513,6 +520,8 @@
     <string name="enablesmbalways_summary">Всегда включать супер микро болюс SMB независимо от болюсов. Возможно только для источников СК с хорошей фильтрацией данных вроде G5</string>
     <string name="enablesmbaftercarbs">Активировать супер микро болюс SMB после углеводов</string>
     <string name="enablesmbaftercarbs_summary">Включать супер микро болюс SMB на 6 часов после углеводов, даже при 0 активных углеводов COB. Возможно только для источников СК с хорошей фильтрацией данных вроде G5</string>
+    <string name="enablesmbignore">Игнорировать источник СК для SMB (РИСКОВАНО)</string>
+    <string name="enablesmbaftercarbs_ignore">Включить SMB даже для источников СК без поддержки фильтрации (РИСКОВАНО)</string>
     <string name="enablesmbwithcob">Включить супер микро болюс при активных углеводах COB</string>
     <string name="enablesmbwithcob_summary">Включить супер микро болюс SMB, когда имеются активные углеводы COB.</string>
     <string name="enablesmbwithtemptarget">Включить супер микро болюс SMB с временными целями</string>
