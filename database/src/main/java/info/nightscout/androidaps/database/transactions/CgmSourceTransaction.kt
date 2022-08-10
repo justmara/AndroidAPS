@@ -219,7 +219,7 @@ class CgmSourceTransaction(
         val timestamp: Long,
         val value: Double,
         val raw: Double?,
-        val smoothed: Double,
+        val smoothed: Double?,
         val noise: Double?,
         val trendArrow: GlucoseValue.TrendArrow,
         val nightscoutId: String? = null,

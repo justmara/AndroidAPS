@@ -2,9 +2,11 @@ package info.nightscout.androidaps.plugins.iob.iobCobCalculator
 
 import androidx.collection.LongSparseArray
 import info.nightscout.androidaps.annotations.OpenForTesting
+import info.nightscout.androidaps.core.R
 import info.nightscout.androidaps.data.InMemoryGlucoseValue
 import info.nightscout.androidaps.database.AppRepository
 import info.nightscout.androidaps.database.entities.GlucoseValue
+import info.nightscout.androidaps.extensions.rawOrSmoothed
 import info.nightscout.shared.logging.AAPSLogger
 import info.nightscout.shared.logging.LTag
 import info.nightscout.androidaps.plugins.bus.RxBus
@@ -238,6 +240,7 @@ class AutosensDataStore {
             bucketedData = null
             return
         }
+        val useBgSmoothing = sp.getBoolean(R.string.key_use_data_smoothing, false)
         val newBucketedData = ArrayList<InMemoryGlucoseValue>()
         var currentTime = bgReadings[0].timestamp - bgReadings[0].timestamp % T.mins(5).msecs()
         val adjustedTime = adjustToReferenceTime(currentTime)
@@ -255,10 +258,10 @@ class AutosensDataStore {
                 newBucketedData.add(InMemoryGlucoseValue(newer))
             } else {
                 val bgDeltaRaw = newer.value - older.value
-                val bgDeltaSmoothed = newer.smoothed - older.smoothed
+                val bgDeltaSmoothed = newer.rawOrSmoothed(useBgSmoothing) - older.rawOrSmoothed(useBgSmoothing)
                 val timeDiffToNew = newer.timestamp - currentTime
                 val currentBgRaw = newer.value - timeDiffToNew.toDouble() / (newer.timestamp - older.timestamp) * bgDeltaRaw
-                val currentBgSmoothed = newer.smoothed - timeDiffToNew.toDouble() / (newer.timestamp - older.timestamp) * bgDeltaSmoothed
+                val currentBgSmoothed = newer.rawOrSmoothed(useBgSmoothing) - timeDiffToNew.toDouble() / (newer.timestamp - older.timestamp) * bgDeltaSmoothed
 
                 val newBgReading = InMemoryGlucoseValue(currentTime, currentBgRaw.roundToLong().toDouble(), currentBgSmoothed.roundToLong().toDouble(),true)
                 newBucketedData.add(newBgReading)
@@ -275,6 +278,7 @@ class AutosensDataStore {
             return
         }
         val bData: MutableList<InMemoryGlucoseValue> = ArrayList()
+        val useBgSmoothing = sp.getBoolean(R.string.key_use_data_smoothing, false)
         bData.add(InMemoryGlucoseValue(bgReadings[0]))
         aapsLogger.debug(LTag.AUTOSENS, {"Adding. bgTime: " + dateUtil.toISOString(bgReadings[0].timestamp) + " lastBgTime: " + "none-first-value" + " " + bgReadings[0].toString()})
         var j = 0
@@ -287,7 +291,7 @@ class AutosensDataStore {
                 abs(elapsedMinutes) > 8 -> {
                     // interpolate missing data points
                     var lastBgRaw = bgReadings[i - 1].value
-                    var lastBgSmoothed = bgReadings[i - 1].smoothed
+                    var lastBgSmoothed = bgReadings[i - 1].rawOrSmoothed(useBgSmoothing)
                     elapsedMinutes = abs(elapsedMinutes)
                     //console.error(elapsed_minutes);
                     var nextBgTime: Long
@@ -323,7 +327,7 @@ class AutosensDataStore {
 
                 else                    -> {
                     bData[j].value = (bData[j].value + bgReadings[i].value) / 2
-                    bData[j].smoothed = (bData[j].smoothed + bgReadings[i].smoothed) / 2
+                    bData[j].smoothed = (bData[j].rawOrSmoothed(sp) + bgReadings[i].rawOrSmoothed(useBgSmoothing)) / 2
                     //log.error("***** Average");
                 }
             }

@@ -54,10 +54,11 @@ class BgQualityCheckPluginTest : TestBase() {
         Assert.assertEquals(R.drawable.ic_baseline_warning_24_yellow, plugin.icon())
 
         val superData: MutableList<GlucoseValue> = ArrayList()
-        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, timestamp = T.mins(20).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
-        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, timestamp = T.mins(15).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
-        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, timestamp = T.mins(10).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
-        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, timestamp = T.mins(5).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
+        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, smoothed= null, timestamp = T.mins(20).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue
+            .TrendArrow.FLAT))
+        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, smoothed= null, timestamp = T.mins(15).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
+        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, smoothed= null, timestamp = T.mins(10).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
+        superData.add(GlucoseValue(raw = 0.0, noise = 0.0, value = 100.0, smoothed= null, timestamp = T.mins(5).msecs(), sourceSensor = GlucoseValue.SourceSensor.UNKNOWN, trendArrow = GlucoseValue.TrendArrow.FLAT))
         autosensDataStore.bgReadings = superData
 
         autosensDataStore.lastUsed5minCalculation = true
@@ -73,6 +74,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(20).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -83,6 +85,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(20).msecs() + 1,
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -93,6 +96,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(10).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -103,6 +107,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(15).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -113,6 +118,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(5).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -131,6 +137,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(20).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -141,6 +148,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(20).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -151,6 +159,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(10).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -161,6 +170,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(15).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT
@@ -171,6 +181,7 @@ class BgQualityCheckPluginTest : TestBase() {
                 raw = 0.0,
                 noise = 0.0,
                 value = 100.0,
+                smoothed= null,
                 timestamp = T.mins(5).msecs(),
                 sourceSensor = GlucoseValue.SourceSensor.UNKNOWN,
                 trendArrow = GlucoseValue.TrendArrow.FLAT

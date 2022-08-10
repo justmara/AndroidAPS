@@ -4,7 +4,7 @@ import info.nightscout.androidaps.core.R
 import info.nightscout.androidaps.database.entities.GlucoseValue
 import info.nightscout.shared.sharedPreferences.SP
 
-class InMemoryGlucoseValue constructor(var timestamp: Long = 0L, var value: Double = 0.0, var smoothed: Double = 0.0, var interpolated: Boolean = false) {
+class InMemoryGlucoseValue constructor(var timestamp: Long = 0L, var value: Double = 0.0, var smoothed: Double? = null, var interpolated: Boolean = false) {
 
     constructor(gv: GlucoseValue) : this(gv.timestamp, gv.value, gv.smoothed)
     // var generated : value doesn't correspond to real value with timestamp close to real BG
@@ -13,7 +13,7 @@ class InMemoryGlucoseValue constructor(var timestamp: Long = 0L, var value: Doub
     }
 
     fun rawOrSmoothed(sp: SP): Double {
-        if (useDataSmoothing(sp)) return smoothed
+        if (useDataSmoothing(sp)) return smoothed ?: value
         else return value
     }
 }

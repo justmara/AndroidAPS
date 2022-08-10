@@ -105,7 +105,7 @@ class NSClientSourcePlugin @Inject constructor(
                 timestamp = sgv.mills ?: return null,
                 value = sgv.mgdl?.toDouble() ?: return null,
                 raw = sgv.filtered?.toDouble() ?: sgv.mgdl?.toDouble(),
-                smoothed = 0.0,
+                smoothed = null,
                 noise = null,
                 trendArrow = GlucoseValue.TrendArrow.fromString(sgv.direction),
                 nightscoutId = sgv.id,

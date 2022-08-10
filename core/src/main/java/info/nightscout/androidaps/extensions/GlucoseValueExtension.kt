@@ -14,7 +14,12 @@ fun useDataSmoothing(sp: SP): Boolean {
 }
 
 fun GlucoseValue.rawOrSmoothed(sp: SP): Double {
-    if (useDataSmoothing(sp)) return smoothed
+    if (useDataSmoothing(sp)) return smoothed ?: value
+    else return value
+}
+
+fun GlucoseValue.rawOrSmoothed(useSmoothed: Boolean): Double {
+    if (useSmoothed) return smoothed ?: value
     else return value
 }
 
