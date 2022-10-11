@@ -1246,6 +1246,7 @@
     <string name="openapsama_smb_max_range_extension">SMB/UAM max range extension</string>
 
     <!-- AIMI -->
+    <string name="key_use_AimiIgnoreCOB" translatable="false">key_use_AimiIgnoreCOB</string>
     <string name="key_use_AimiUAM" translatable="false">key_use_AimiUAM</string>
     <string name="key_use_disable_b30_BFL" translatable="false">key_use_disable_b30_BFL</string>
     <string name="key_use_AimiPower" translatable="false">key_use_AimiPower</string>
