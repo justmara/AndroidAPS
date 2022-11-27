@@ -468,7 +468,8 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
     var TDD = meal_data.TDD;
 
     // SR_TDD ********************************
-    var SR_TDD = meal_data.TDDLastCannula / meal_data.TDDAvgtoCannula;
+    var SR_TDD = TDD / meal_data.TDDLastCannula;
+    //var SR_TDD = meal_data.TDDLastCannula / meal_data.TDDAvgtoCannula;
     //var endebug = "AtoC=" + round(meal_data.TDDAvgtoCannula,2) + " LC=" + round(meal_data.TDDLastCannula,2);
 
     // ISF based on TDD
@@ -538,7 +539,10 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
         // dont apply autosens limits to show SR_TDD full potential
         //SR_TDD = Math.min(SR_TDD, profile.autosens_max);
         //SR_TDD = Math.max(SR_TDD, profile.autosens_min);
+        // Use SR_TDD when no TT, profile switch
         sensitivityRatio = (profile.temptargetSet && !ENTTActive || profile.percent != 100 ?  1 : SR_TDD);
+        // when SR_TDD shows sensitivity but TIR is resistant reset sensitivityRatio to 100%
+        // sensitivityRatio = (TIR_sens > 1 && sensitivityRatio < 1 ?  1 : sensitivityRatio);
         // adjust basal later
         // basal = profile.current_basal * sensitivityRatio;
         // adjust sens_normalTarget below with TIR_sens
@@ -1212,6 +1216,8 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             }
             // set initial eBGw at 50% unless bg is in range and accelerating or preBolus
             eBGweight = (bg < ISFbgMax && eventualBG > bg || UAMBGPreBolus || UAMCOBPreBolus ? 0.75 : 0.50);
+            // SAFETY: UAM+ fast delta with higher bg lowers eBGw
+            // eBGweight = (bg > ISFbgMax && delta >= 15 ? 0.30 : eBGweight);
             AllowZT = false; // disable ZT for UAM+
         }
 
@@ -1715,7 +1721,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             rT.reason += " insulinReq" + (insulinReq_bg_boost > 0 ? "+ " : " ") + insulinReq + (insulinReq != insulinReqOrig ? "(" + insulinReqOrig + ")" : "") + "@" + round(insulinReqPct * 100, 0) + "%";
 
             if (microBolus >= maxBolus) {
-                rT.reason += "; maxBolus " + maxBolus;
+                rT.reason += "; maxBolus: " + maxBolus;
             }
             if (durationReq > 0 && AllowZT) {
                 rT.reason += "; setting " + durationReq + "m low temp of " + smbLowTempReq + "U/h";

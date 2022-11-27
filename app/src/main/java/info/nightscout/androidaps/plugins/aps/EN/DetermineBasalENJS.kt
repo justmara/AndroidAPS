@@ -246,6 +246,8 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         val normalTargetBG = profile.getTargetMgdl().roundToInt()
         this.profile.put("normal_target_bg", normalTargetBG)
         this.profile.put("enableGhostCOB", sp.getBoolean(R.string.key_use_ghostcob, false))
+        this.profile.put("enableGhostCOBAlways", sp.getBoolean(R.string.key_use_ghostcob_always, false))
+
         this.profile.put("allowENWovernight", sp.getBoolean(R.string.key_use_enw_overnight, false))
         this.profile.put("use_ebgw", sp.getBoolean(R.string.key_eatingnow_use_ebgw, true))
         //this.profile.put("COBWindow", sp.getInt(R.string.key_eatingnow_cobboostminutes, 0))
@@ -328,31 +330,29 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         val firstCarbTime = getCarbsSinceENStart.lastOrNull()?.timestamp
         this.mealData.put("firstCarbTime",firstCarbTime)
 
-        // get the FIRST bolus time since EN activation
-        val firstENBolusTime = repository.getENBolusFromTimeOfType(ENStartTime,true, Bolus.Type.NORMAL, enwMinBolus ).blockingGet().lastOrNull()?.timestamp
-        val firstENBolusUnits = repository.getENBolusFromTimeOfType(ENStartTime,true, Bolus.Type.NORMAL, enwMinBolus ).blockingGet().lastOrNull()?.amount
-        this.mealData.put("firstENBolusTime",firstENBolusTime)
-        this.mealData.put("firstENBolusUnits",firstENBolusUnits)
-
         // get the FIRST EN TT time since EN activation
-        val firstENTempTargetTime = repository.getENTemporaryTargetDataFromTime(ENStartTime,true).blockingGet().lastOrNull()?.timestamp
-        this.mealData.put("firstENTempTargetTime",firstENTempTargetTime)
-
-        // get the current EN TT info
-        val activeENTempTargetStartTime = repository.getENTemporaryTargetActiveAt(now).blockingGet().lastOrNull()?.timestamp
-        this.mealData.put("activeENTempTargetStartTime",activeENTempTargetStartTime)
-        val activeENTempTargetDuration = repository.getENTemporaryTargetActiveAt(now).blockingGet().lastOrNull()?.duration
-        if (activeENTempTargetDuration != null) {
-            this.mealData.put("activeENTempTargetDuration",activeENTempTargetDuration/60000)
-        } else {
-            this.mealData.put("activeENTempTargetDuration", 0)
+        repository.getENTemporaryTargetDataFromTime(ENStartTime,true).blockingGet().lastOrNull()?.let { firstENTempTarget ->
+            this.mealData.put("firstENTempTargetTime", firstENTempTarget.timestamp)
         }
 
-        // get the LAST bolus time since EN activation
-        val lastENBolusTime = repository.getENBolusFromTimeOfType(ENStartTime,false, Bolus.Type.NORMAL, enwMinBolus ).blockingGet().lastOrNull()?.timestamp
-        val lastENBolusUnits = repository.getENBolusFromTimeOfType(ENStartTime,false, Bolus.Type.NORMAL, enwMinBolus ).blockingGet().lastOrNull()?.amount
-        this.mealData.put("lastENBolusTime",lastENBolusTime)
-        this.mealData.put("lastENBolusUnits",lastENBolusUnits)
+        // get the current EN TT info
+        repository.getENTemporaryTargetActiveAt(now).blockingGet().lastOrNull()?.let { activeENTempTarget ->
+            this.mealData.put("activeENTempTargetStartTime",activeENTempTarget.timestamp)
+            this.mealData.put("activeENTempTargetDuration",activeENTempTarget.duration/60000)
+        }
+
+        if (enwMinBolus > 0) {
+            // get the FIRST bolus time since EN activation
+            repository.getENBolusFromTimeOfType(ENStartTime,true, Bolus.Type.NORMAL, enwMinBolus ).blockingGet().lastOrNull()?.let { firstENBolus->
+                this.mealData.put("firstENBolusTime", firstENBolus.timestamp)
+                this.mealData.put("firstENBolusUnits", firstENBolus.amount)
+            }
+            // get the LAST bolus time since EN activation
+            repository.getENBolusFromTimeOfType(ENStartTime, false, Bolus.Type.NORMAL, enwMinBolus).blockingGet().lastOrNull()?.let { lastENBolus ->
+                this.mealData.put("lastENBolusTime", lastENBolus.timestamp)
+                this.mealData.put("lastENBolusUnits", lastENBolus.amount)
+            }
+        }
 
         // 3PM is used as a low basal point at which the rest of the day leverages for ISF variance when using one ISF in the profile
         this.profile.put("enableBasalAt3PM", sp.getBoolean(R.string.key_use_3pm_basal, false))
@@ -362,6 +362,8 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         val enableSensTDD = sp.getBoolean(R.string.key_use_sens_tdd, false)
         this.profile.put("use_sens_TDD", enableSensTDD) // Override profile ISF with TDD ISF if selected in prefs
         this.profile.put("sens_TDD_useProfile", sp.getBoolean(R.string.key_sens_tdd_use_profile, false))
+        val enableSensLCTDD = sp.getBoolean(R.string.key_use_sens_lctdd, false)
+        this.profile.put("use_sens_LCTDD", enableSensLCTDD) // Override profile ISF with LCTDD ISF if selected in prefs
         this.profile.put("sens_TDD_scale",SafeParse.stringToDouble(sp.getString(R.string.key_sens_tdd_scale,"100")))
         this.profile.put("percent", if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100)
         val enableSRTDD = sp.getBoolean(R.string.key_use_sr_tdd, false)
@@ -373,8 +375,8 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         val TDDLastUpdate =  sp.getLong("TDDLastUpdate",0)
         val TDDHrSinceUpdate = (now - TDDLastUpdate) / 3600000
 
-        if (TDDLastUpdate == 0L || TDDHrSinceUpdate > 12) {
-            // Generate the data for the larger datasets every 12 hours
+        if (TDDLastUpdate == 0L || TDDHrSinceUpdate > 6) {
+            // Generate the data for the larger datasets every 6 hours
             var TDDAvg7d = tddCalculator.averageTDD(tddCalculator.calculate(7))?.totalAmount
             if (TDDAvg7d == 0.0 || TDDAvg7d == null ) TDDAvg7d = ((basalRate * 12)*100)/21
             sp.putDouble("TDDAvg7d", TDDAvg7d)
@@ -416,15 +418,14 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         // this.mealData.put("lastCannAgeMins", lastCannAgeMins)
 
         // sp.putDouble("TDDAvgtoCannula", 0.0) // reset
-        val TDDAvgtoCannula = sp.getDouble("TDDAvgtoCannula", 0.0)
+        var TDDAvgtoCannula = sp.getDouble("TDDAvgtoCannula", 0.0)
         if (lastCannAgeMins <= 30 || TDDAvgtoCannula == 0.0) {
             val daysPrior = 3
-            val TDDAvgtoCannula = tddCalculator.calculate(lastCannulaTime - 86400000 * daysPrior, lastCannulaTime).totalAmount / daysPrior
+            TDDAvgtoCannula = tddCalculator.calculate(lastCannulaTime - 86400000 * daysPrior, lastCannulaTime).totalAmount / daysPrior
             sp.putDouble("TDDAvgtoCannula", TDDAvgtoCannula)
         }
         this.mealData.put("TDDAvgtoCannula", TDDAvgtoCannula)
-        // val TDDLastCannula = if (lastCannAgeMins > 1440) tddCalculator.calculate(lastCannulaTime, now).totalAmount / (lastCannAgeMins/1440) else TDDAvgtoCannula
-        val TDDLastCannula = if (lastCannAgeMins > 1440) tddCalculator.calculate(lastCannulaTime, now).totalAmount / (lastCannAgeMins/1440) else TDDAvgtoCannula
+        val TDDLastCannula = if (lastCannAgeMins > 1440) tddCalculator.calculate(lastCannulaTime, now).totalAmount / (lastCannAgeMins/1440) else (TDDAvg7d * 0.8) + (TDD * 0.2)
         this.mealData.put("TDDLastCannula", TDDLastCannula)
 
         this.mealData.put("TDDAvg7d", sp.getDouble("TDDAvg7d", ((basalRate * 12)*100)/21))
@@ -443,22 +444,19 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
 
         // TIR Windows for normalTarget
         if (resistancePerHr > 0) {
-            this.mealData.put("TIRTW4H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(4, 3, normalTargetBG-9.0, normalTargetBG+9.0)).abovePct())
-            this.mealData.put("TIRTW3H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3, 2, normalTargetBG-9.0, normalTargetBG+9.0)).abovePct())
-            this.mealData.put("TIRTW2H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2, 1, normalTargetBG-9.0, normalTargetBG+9.0)).abovePct())
-            this.mealData.put("TIRTW1H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1, 0, normalTargetBG-9.0, normalTargetBG+9.0)).abovePct())
+            val tirTW4 = tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(4, 3, normalTargetBG-9.0, normalTargetBG+9.0));
+            this.mealData.put("TIRTW4H", tirTW4.abovePct())
+            this.mealData.put("TIRTW4L", tirTW4.belowPct())
+            val tirTW3 = tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3, 2, normalTargetBG-9.0, normalTargetBG+9.0))
+            this.mealData.put("TIRTW3H", tirTW3.abovePct())
+            this.mealData.put("TIRTW3L", tirTW3.belowPct())
+            val tirTW2 = tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2, 1, normalTargetBG-9.0, normalTargetBG+9.0))
+            this.mealData.put("TIRTW2H", tirTW2.abovePct())
+            this.mealData.put("TIRTW2L", tirTW2.belowPct())
+            val tirTW1 = tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1, 0, normalTargetBG-9.0, normalTargetBG+9.0))
+            this.mealData.put("TIRTW1H", tirTW1.abovePct())
+            this.mealData.put("TIRTW1L", tirTW1.belowPct())
         }
-
-        //
-        // this.mealData.put("TIRW4",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(4,3,72.0, 180.0)).inRangePct())
-        // this.mealData.put("TIRW3",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3,2,72.0, 180.0)).inRangePct())
-        // this.mealData.put("TIRW2",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2,1,72.0, 180.0)).inRangePct())
-        // this.mealData.put("TIRW1",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1,0,72.0, 180.0)).inRangePct())
-        //
-        // this.mealData.put("TIRW4L",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(4,3,72.0, 180.0)).belowPct())
-        // this.mealData.put("TIRW3L",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3,2,72.0, 180.0)).belowPct())
-        // this.mealData.put("TIRW2L",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2,1,72.0, 180.0)).belowPct())
-        // this.mealData.put("TIRW1L",tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1,0,72.0, 180.0)).belowPct())
 
         if (constraintChecker.isAutosensModeEnabled().value()) {
             autosensData.put("ratio", autosensDataRatio)
