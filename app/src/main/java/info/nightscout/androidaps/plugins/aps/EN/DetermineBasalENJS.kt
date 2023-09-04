@@ -272,9 +272,11 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         this.profile.put("EN_UAM_maxBolus", sp.getDouble(R.string.key_eatingnow_uamboost_maxbolus, 0.0))
         this.profile.put("UAMbgBoost_bkfast", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_uambgboost_bkfast, 0.0),profileFunction.getUnits()))
         this.profile.put("EN_UAMPlus_PreBolus_bkfast", sp.getDouble(R.string.key_eatingnow_uambgboost_maxbolus_bkfast, 0.0))
-        this.profile.put("UAMbgBoost", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_uambgboost, 0.0),profileFunction.getUnits()))
+        // this.profile.put("UAMbgBoost", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_uambgboost, 0.0),profileFunction.getUnits()))
         this.profile.put("EN_UAMPlus_PreBolus", sp.getDouble(R.string.key_eatingnow_uambgboost_maxbolus, 0.0))
         this.profile.put("EN_UAMPlus_NoENW", sp.getBoolean(R.string.key_use_uamplus_noenw, false))
+        this.profile.put("EN_UAMPlusSMB_NoENW", sp.getBoolean(R.string.key_use_uamplus_noenw, false))
+        this.profile.put("EN_UAMPlusTBR_NoENW", sp.getBoolean(R.string.key_use_uamplustbr_noenw, false))
         this.profile.put("EN_UAMPlus_maxBolus", sp.getDouble(R.string.key_eatingnow_uamplus_maxbolus, 0.0))
         this.profile.put("EN_NoENW_maxBolus", sp.getDouble(R.string.key_eatingnow_noenw_maxbolus, 0.0))
         this.profile.put("EN_BGPlus_maxBolus", sp.getDouble(R.string.key_eatingnow_bgplus_maxbolus, 0.0))
@@ -319,6 +321,7 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         this.mealData.put("slopeFromMaxDeviation", mealData.slopeFromMaxDeviation)
         this.mealData.put("slopeFromMinDeviation", mealData.slopeFromMinDeviation)
         this.mealData.put("lastBolusTime", mealData.lastBolusTime)
+        this.mealData.put("lastBolusUnits", repository.getLastBolusRecord()?.amount ?: 0L) // EatingNow
         this.mealData.put("lastCarbTime", mealData.lastCarbTime)
 
         // set the EN start time based on prefs
@@ -366,6 +369,9 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
             val lastENTempTargetTime = ENTempTarget.lastOrNull()?.timestamp ?: 0
             this.mealData.put("lastENTempTargetTime",lastENTempTargetTime)
             ENWStartTimeArray += lastENTempTargetTime
+
+            val lastENTempTargetDuration = ENTempTarget.lastOrNull()?.duration ?: 0
+            this.mealData.put("lastENTempTargetDuration",lastENTempTargetDuration/60000)
         }
 
         // get the current EN TT info
@@ -382,6 +388,7 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         // get the TDD since ENW Start
         this.mealData.put("ENWStartTime", ENWStartTime)
         this.mealData.put("ENWTDD", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now).bolusAmount else 0)
+        this.mealData.put("ENWBolusIOB", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now).bolusAmount else 0)
         // this.mealData.put("ENWTDD", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now).totalAmount else 0)
         // this.mealData.put("ENWTDD", 0)
         this.profile.put("ENW_breakfast_max_tdd", sp.getDouble(R.string.key_enw_breakfast_max_tdd, 0.0))
@@ -451,15 +458,17 @@ class DetermineBasalAdapterENJS internal constructor(private val scriptReader: S
         val lastCannAgeMins = ((now - lastCannulaTime) / 60000).toDouble()
         // this.mealData.put("lastCannAgeMins", lastCannAgeMins)
 
-        // sp.putDouble("TDDAvgtoCannula", 0.0) // reset
-        val TDDAvgtoCannula = sp.getDouble("TDDAvgtoCannula", 0.0)
-        if (lastCannAgeMins <= 30 || TDDAvgtoCannula == 0.0) {
-            val daysPrior = 3
-            val TDDAvgtoCannula = tddCalculator.calculate(lastCannulaTime - 86400000 * daysPrior, lastCannulaTime).totalAmount / daysPrior
-            sp.putDouble("TDDAvgtoCannula", TDDAvgtoCannula)
-        }
-        this.mealData.put("TDDAvgtoCannula", TDDAvgtoCannula)
-        val TDDLastCannula = if (lastCannAgeMins > 1440) tddCalculator.calculate(lastCannulaTime, now).totalAmount / (lastCannAgeMins/1440) else (TDDAvg7d * 0.8) + (TDD * 0.2)
+        // Calculate TDD prior to last cannula change
+        // // sp.putDouble("TDDAvgtoCannula", 0.0) // reset
+        // val TDDAvgtoCannula = sp.getDouble("TDDAvgtoCannula", 0.0)
+        // if (lastCannAgeMins <= 30 || TDDAvgtoCannula == 0.0) {
+        //     val daysPrior = 3
+        //     val TDDAvgtoCannula = tddCalculator.calculate(lastCannulaTime - 86400000 * daysPrior, lastCannulaTime).totalAmount / daysPrior
+        //     sp.putDouble("TDDAvgtoCannula", TDDAvgtoCannula)
+        // }
+        // this.mealData.put("TDDAvgtoCannula", TDDAvgtoCannula)
+
+        val TDDLastCannula = if (lastCannAgeMins > 1440 && enableSensLCTDD) tddCalculator.calculate(lastCannulaTime, now).totalAmount / (lastCannAgeMins/1440) else (TDDAvg7d * 0.8) + (TDD * 0.2)
         this.mealData.put("TDDLastCannula", TDDLastCannula)
 
         this.mealData.put("TDDAvg7d", sp.getDouble("TDDAvg7d", ((basalRate * 12)*100)/21))
