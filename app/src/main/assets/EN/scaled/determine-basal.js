@@ -430,17 +430,6 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
 //    ENW_max_tdd = (ENWindowOK && meal_data.ENWTDD > 0 ? ENW_max_tdd : 0); // reset to 0 if not within an ENW max at 4h by DetermineBasalAdapter
 
 
-    // Allow user preferences to adjust the scaling of ISF as BG increases
-    // Scaling is converted to a percentage, 0 is normal scaling (1), 5 is 5% stronger (0.95) and -5 is 5% weaker (1.05)
-    // When eating now is not active during the day or at night do not apply additional scaling unless weaker
-    var ISFBGscaler = (ENSleepModeNoSMB || !ENactive && ENtimeOK ? Math.min(profile.ISFbgscaler, 0) : profile.ISFbgscaler);
-    enlog += "ISFBGscaler is now :" + round(ISFBGscaler, 2) + "\n";
-    // Convert ISFBGscaler to %
-    ISFBGscaler = (100 - ISFBGscaler) / 100;
-    enlog += "ISFBGscaler % is now: " + round(ISFBGscaler, 2) + "\n";
-    var ISFBGscalerVelocity = profile.ISFbgscaler_velocity / 100;
-    enlog += "ISFBGscalerVelocity is now: " + ISFBGscalerVelocity + "\n";
-
     // stronger CR and ISF can be used when firstmeal is within 2h window
     var firstMealScaling = (firstMealWindow && !profile.use_sens_TDD && profile.sens == profile.sens_midnight && profile.carb_ratio == profile.carb_ratio_midnight);
     var carb_ratio = (firstMealScaling ? round(profile.carb_ratio_midnight / (profile.BreakfastPct / 100), 1) : profile.carb_ratio);
@@ -462,11 +451,22 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
     var SMBbgOffset_night = (profile.SMBbgOffset > 0 ? target_bg + profile.SMBbgOffset : 0);
     var SMBbgOffset_day = (profile.SMBbgOffset_day > 0 ? target_bg + profile.SMBbgOffset_day : 0);
 
-    var ENSleepModeNoSMB = !ENactive && !ENtimeOK && bg < SMBbgOffset_night;
+    var ENSleepModeNoSMB = !ENtimeOK && bg < SMBbgOffset_night;
     var ENDayModeNoSMB = ENactive && ENtimeOK && !ENWindowOK && bg < SMBbgOffset_day;
 
     enlog += "SMBbgOffset_night:" + SMBbgOffset_night + "\n";
     enlog += "SMBbgOffset_day:" + SMBbgOffset_day + "\n";
+
+    // Allow user preferences to adjust the scaling of ISF as BG increases
+    // Scaling is converted to a percentage, 0 is normal scaling (1), 5 is 5% stronger (0.95) and -5 is 5% weaker (1.05)
+    // When eating now is not active during the day or at night do not apply additional scaling unless weaker
+    var ISFBGscaler = (ENSleepModeNoSMB || !ENactive && ENtimeOK ? Math.min(profile.ISFbgscaler, 0) : profile.ISFbgscaler);
+    enlog += "ISFBGscaler is now :" + round(ISFBGscaler, 2) + "\n";
+    // Convert ISFBGscaler to %
+    ISFBGscaler = (100 - ISFBGscaler) / 100;
+    enlog += "ISFBGscaler % is now: " + round(ISFBGscaler, 2) + "\n";
+    var ISFBGscalerVelocity = profile.ISFbgscaler_velocity / 100;
+    enlog += "ISFBGscalerVelocity is now: " + ISFBGscalerVelocity + "\n";
 
     var COB = meal_data.mealCOB;
 
