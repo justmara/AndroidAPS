@@ -315,7 +315,7 @@ var getIsfByProfile = function (bg, profile) {
                 autosensData.put("ratio", Math.max(Math.min(tddLast24H / tdd7D, autosens_max), autosens_min ))
         }
 
-        if (dynISFvelocity != 1.0) {
+        if (dynISFvelocity > 0.0) {
             val sbg = ln((glucoseStatus.glucose / insulinDivisor) + 1)
             val scaler = ln((profile.getTargetMgdl() / insulinDivisor) + 1) / sbg
             variableSensitivity = sensNormalTarget * (1 - (1 - scaler) * dynISFvelocity)
