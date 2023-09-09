@@ -12,9 +12,6 @@
             android:title="@string/combov2_pair_with_pump_title"
             android:summary="@string/combov2_pair_with_pump_summary"
             android:shouldDisableView="true">
-            <intent
-                android:targetClass="info.nightscout.androidaps.plugins.pump.combov2.activities.ComboV2PairingActivity"
-                android:targetPackage="info.nightscout.androidaps" />
         </Preference>
 
         <Preference
@@ -23,7 +20,7 @@
             android:key="@string/key_combov2_unpair_pump"
             android:shouldDisableView="true"/>
 
-        <info.nightscout.core.ui.elements.IntSeekBarPreference
+        <info.nightscout.androidaps.utils.ui.IntSeekBarPreference
             android:key="@string/key_combov2_discovery_duration"
             android:title="@string/combov2_discovery_duration"
             android:min="30"

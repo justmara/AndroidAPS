@@ -13,24 +13,24 @@ import info.nightscout.comboctl.parser.ParsedScreen
 import info.nightscout.comboctl.parser.testFrameMainScreenWithTimeSeparator
 import info.nightscout.comboctl.parser.testFrameMainScreenWithoutTimeSeparator
 import info.nightscout.comboctl.parser.testFrameStandardBolusMenuScreen
-import info.nightscout.comboctl.parser.testFrameTbrDurationEnglishScreen
+import info.nightscout.comboctl.parser.TbrPercentageAndDurationScreens
 import info.nightscout.comboctl.parser.testFrameTemporaryBasalRateNoPercentageScreen
 import info.nightscout.comboctl.parser.testFrameTemporaryBasalRatePercentage110Screen
 import info.nightscout.comboctl.parser.testFrameW6CancelTbrWarningScreen
 import info.nightscout.comboctl.parser.testTimeAndDateSettingsHourPolishScreen
 import info.nightscout.comboctl.parser.testTimeAndDateSettingsHourRussianScreen
 import info.nightscout.comboctl.parser.testTimeAndDateSettingsHourTurkishScreen
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.BeforeAll
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.BeforeAll
 
 class ParsedDisplayFrameStreamTest {
     companion object {
@@ -300,7 +300,7 @@ class ParsedDisplayFrameStreamTest {
         // We expect normal parsing behavior.
         stream.feedDisplayFrame(testFrameW6CancelTbrWarningScreen)
         val parsedWarningFrame = stream.getParsedDisplayFrame(processAlertScreens = false)
-        assertEquals(ParsedScreen.AlertScreen(AlertScreenContent.Warning(6)), parsedWarningFrame!!.parsedScreen)
+        assertEquals(ParsedScreen.AlertScreen(AlertScreenContent.Warning(6, AlertScreenContent.AlertScreenState.TO_SNOOZE)), parsedWarningFrame!!.parsedScreen)
 
         // Feed a W6 screen, but with alert screen detection enabled.
         // We expect the alert screen to be detected and an exception
@@ -328,7 +328,7 @@ class ParsedDisplayFrameStreamTest {
         val displayFrameList = listOf(
             testFrameTemporaryBasalRatePercentage110Screen,
             testFrameTemporaryBasalRateNoPercentageScreen,
-            testFrameTbrDurationEnglishScreen
+            TbrPercentageAndDurationScreens.testFrameTbrDurationEnglishScreen
         )
 
         val parsedFrameList = mutableListOf<ParsedDisplayFrame>()

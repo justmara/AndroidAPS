@@ -1,25 +1,27 @@
 package info.nightscout.comboctl.android
 
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter as SystemBluetoothAdapter
-import android.bluetooth.BluetoothDevice as SystemBluetoothDevice
-import android.bluetooth.BluetoothManager as SystemBluetoothManager
-import android.bluetooth.BluetoothServerSocket as SystemBluetoothServerSocket
-import android.bluetooth.BluetoothSocket as SystemBluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import info.nightscout.comboctl.base.BluetoothAddress
 import info.nightscout.comboctl.base.BluetoothDevice
+import info.nightscout.comboctl.base.BluetoothNotEnabledException
 import info.nightscout.comboctl.base.BluetoothException
 import info.nightscout.comboctl.base.BluetoothInterface
+import info.nightscout.comboctl.base.BluetoothNotAvailableException
 import info.nightscout.comboctl.base.LogLevel
 import info.nightscout.comboctl.base.Logger
 import info.nightscout.comboctl.base.toBluetoothAddress
 import java.io.IOException
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
+import android.bluetooth.BluetoothAdapter as SystemBluetoothAdapter
+import android.bluetooth.BluetoothDevice as SystemBluetoothDevice
+import android.bluetooth.BluetoothManager as SystemBluetoothManager
+import android.bluetooth.BluetoothServerSocket as SystemBluetoothServerSocket
+import android.bluetooth.BluetoothSocket as SystemBluetoothSocket
 
 private val logger = Logger.get("AndroidBluetoothInterface")
 
@@ -35,7 +37,10 @@ private val logger = Logger.get("AndroidBluetoothInterface")
  * instance is an ideal choice.
  */
 class AndroidBluetoothInterface(private val androidContext: Context) : BluetoothInterface {
-    private var bluetoothAdapter: SystemBluetoothAdapter? = null
+    private var _bluetoothAdapter: SystemBluetoothAdapter? = null
+    private val bluetoothAdapter: SystemBluetoothAdapter
+        get() = _bluetoothAdapter ?: throw BluetoothNotAvailableException()
+
     private var rfcommServerSocket: SystemBluetoothServerSocket? = null
     private var discoveryStarted = false
     private var discoveryBroadcastReceiver: BroadcastReceiver? = null
@@ -88,12 +93,24 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
 
     override var deviceFilterCallback: (deviceAddress: BluetoothAddress) -> Boolean = { true }
 
+    /**
+     * Safe version of getParcelableExtra depending on Android version running
+     */
+    fun <T> Intent.safeGetParcelableExtra(name: String?, clazz: Class<T>): T? =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) getParcelableExtra(name, clazz)
+        else @Suppress("DEPRECATION") getParcelableExtra(name)
+
     fun setup() {
-        val bluetoothManager = androidContext.getSystemService(Context.BLUETOOTH_SERVICE) as SystemBluetoothManager
-        bluetoothAdapter = bluetoothManager.adapter
+        val bluetoothManager = androidContext.getSystemService(Context.BLUETOOTH_SERVICE) as? SystemBluetoothManager
+        _bluetoothAdapter = bluetoothManager?.adapter
+
+        checkIfBluetoothEnabledAndAvailable()
 
         val bondedDevices = checkForConnectPermission(androidContext) {
-            bluetoothAdapter!!.bondedDevices
+            // The "not enabled" check above is important, because in the disabled
+            // state, the adapter returns an empty list here. This would mislead
+            // the logic below into thinking that there are no bonded devices.
+            bluetoothAdapter.bondedDevices
         }
 
         logger(LogLevel.DEBUG) { "Found ${bondedDevices.size} bonded Bluetooth device(s)" }
@@ -173,7 +190,7 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
         // necessary for correct function, just a detail for sake of completeness.)
         logger(LogLevel.DEBUG) { "Setting up RFCOMM listener socket" }
         rfcommServerSocket = checkForConnectPermission(androidContext) {
-            bluetoothAdapter!!.listenUsingInsecureRfcommWithServiceRecord(
+            bluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord(
                 sdpServiceName,
                 Constants.sdpSerialPortUUID
             )
@@ -196,7 +213,7 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
                         logger(LogLevel.DEBUG) { "Closing accepted incoming RFCOMM socket" }
                         try {
                             socket.close()
-                        } catch (e: IOException) {
+                        } catch (_: IOException) {
                         }
                     }
                 }
@@ -267,20 +284,24 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
         stopDiscoveryInternal()
     }
 
-    override fun getDevice(deviceAddress: BluetoothAddress): BluetoothDevice =
-        AndroidBluetoothDevice(androidContext, bluetoothAdapter!!, deviceAddress)
+    override fun getDevice(deviceAddress: BluetoothAddress): BluetoothDevice {
+        checkIfBluetoothEnabledAndAvailable()
+        return AndroidBluetoothDevice(androidContext, bluetoothAdapter, deviceAddress)
+    }
 
     override fun getAdapterFriendlyName() =
-        checkForConnectPermission(androidContext) { bluetoothAdapter!!.name }
+        checkForConnectPermission(androidContext) { bluetoothAdapter.name }
         ?: throw BluetoothException("Could not get Bluetooth adapter friendly name")
 
-    override fun getPairedDeviceAddresses(): Set<BluetoothAddress> =
-        try {
+    override fun getPairedDeviceAddresses(): Set<BluetoothAddress> {
+        checkIfBluetoothEnabledAndAvailable()
+        return try {
             deviceAddressLock.lock()
             pairedDeviceAddresses.filter { pairedDeviceAddress -> deviceFilterCallback(pairedDeviceAddress) }.toSet()
         } finally {
             deviceAddressLock.unlock()
         }
+    }
 
     private fun stopDiscoveryInternal() {
         // Close the server socket. This frees RFCOMM resources and ends
@@ -313,15 +334,25 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
 
         runIfScanPermissionGranted(androidContext) {
             @SuppressLint("MissingPermission")
-            if (bluetoothAdapter!!.isDiscovering) {
+            if (bluetoothAdapter.isDiscovering) {
                 logger(LogLevel.DEBUG) { "Stopping discovery" }
-                bluetoothAdapter!!.cancelDiscovery()
+                bluetoothAdapter.cancelDiscovery()
             }
         }
 
         if (discoveryStarted) {
             logger(LogLevel.DEBUG) { "Stopped discovery" }
             discoveryStarted = false
+        }
+    }
+
+    private fun checkIfBluetoothEnabledAndAvailable() {
+        // Trying to access bluetoothAdapter here if it is currently null will
+        // automatically cause BluetoothNotAvailableException to be thrown,
+        // so that case is also covered implicitly by this code.
+        if (!bluetoothAdapter.isEnabled || (bluetoothAdapter.state != SystemBluetoothAdapter.STATE_ON)) {
+            logger(LogLevel.ERROR) { "Bluetooth is not enabled" }
+            throw BluetoothNotEnabledException()
         }
     }
 
@@ -334,7 +365,7 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
         // Sanity check to make sure we can actually get
         // a Bluetooth device out of the intent. Otherwise,
         // we have to wait for the next notification.
-        val androidBtDevice = intent.getParcelableExtra<SystemBluetoothDevice>(SystemBluetoothDevice.EXTRA_DEVICE)
+        val androidBtDevice = intent.safeGetParcelableExtra(SystemBluetoothDevice.EXTRA_DEVICE, SystemBluetoothDevice::class.java)
         if (androidBtDevice == null) {
             logger(LogLevel.DEBUG) { "Ignoring ACL_CONNECTED intent that has no Bluetooth device" }
             return
@@ -374,13 +405,6 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
         // instance was already processed. This check here instead
         // verifies if we have seen the same Bluetooth address on
         // *different* Android Bluetooth device instances.
-        // TODO: Test how AndroidBluetoothInterface behaves if the
-        // device is unpaired while discovery  is ongoing (manually by
-        // the user for example). In theory, this should be handled
-        // properly by the onBondStateChanged function below.
-        // TODO: This check may not be necessary on all Android
-        // devices. On some, it seems to also work if we use the
-        // first offered BluetoothDevice.
         if (comboctlBtAddress !in previouslyDiscoveredDevices) {
             previouslyDiscoveredDevices[comboctlBtAddress] = androidBtDevice
             logger(LogLevel.DEBUG) {
@@ -430,7 +454,7 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
         // If so, the caller may have to update states like
         // the pump state store accordingly.
 
-        val androidBtDevice = intent.getParcelableExtra<SystemBluetoothDevice>(SystemBluetoothDevice.EXTRA_DEVICE)
+        val androidBtDevice = intent.safeGetParcelableExtra(SystemBluetoothDevice.EXTRA_DEVICE, SystemBluetoothDevice::class.java)
         if (androidBtDevice == null) {
             logger(LogLevel.DEBUG) { "Ignoring BOND_STATE_CHANGED intent that has no Bluetooth device" }
             return
@@ -486,7 +510,7 @@ class AndroidBluetoothInterface(private val androidContext: Context) : Bluetooth
     }
 
     private fun onPairingRequest(intent: Intent, btPairingPin: String) {
-        val androidBtDevice = intent.getParcelableExtra<SystemBluetoothDevice>(SystemBluetoothDevice.EXTRA_DEVICE)
+        val androidBtDevice = intent.safeGetParcelableExtra(SystemBluetoothDevice.EXTRA_DEVICE, SystemBluetoothDevice::class.java)
         if (androidBtDevice == null) {
             logger(LogLevel.DEBUG) { "Ignoring PAIRING_REQUEST intent that has no Bluetooth device" }
             return
