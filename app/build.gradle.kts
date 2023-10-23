@@ -157,7 +157,9 @@ android {
     useLibrary("org.apache.http.legacy")
 
     //Deleting it causes a binding error
-    dataBinding { enable }
+    buildFeatures {
+        dataBinding = true
+    }
 
     applicationVariants.all {
         val variant = this
