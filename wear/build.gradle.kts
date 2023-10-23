@@ -74,6 +74,19 @@ android {
             versionName = Versions.appVersion + "-aapsclient2"
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs
+            .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
+            .forEach { output ->
+                var flavor = variant.productFlavors[0].name
+                if (flavor == "full") flavor = "aaps"
+                val date = SimpleDateFormat("yyMMdd").format(Date())
+                val fileName = "wear-${flavor}-${version}-custom-${date}.apk"
+                output.outputFileName = fileName
+            }
+    }
 }
 
 allprojects {

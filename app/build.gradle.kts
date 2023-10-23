@@ -11,6 +11,7 @@ plugins {
     id("android-app-dependencies")
     id("test-app-dependencies")
     id("jacoco-app-dependencies")
+    id("appcenter-dependencies")
 }
 
 repositories {
@@ -95,6 +96,10 @@ fun allCommitted(): Boolean {
     return stringBuilder.toString().isEmpty()
 }
 
+fun appCenterKey(): String {
+    return System.getenv("APPCENTER_KEY")
+}
+
 android {
 
     namespace = "app.aaps"
@@ -105,10 +110,11 @@ android {
         targetSdk = Versions.targetSdk
 
         buildConfigField("String", "VERSION", "\"$version\"")
-        buildConfigField("String", "BUILDVERSION", "\"${generateGitBuild()}-${generateDate()}\"")
+        buildConfigField("String", "BUILDVERSION", "\"${generateGitBuild()}-${generateDate()}-custom\"")
         buildConfigField("String", "REMOTE", "\"${generateGitRemote()}\"")
         buildConfigField("String", "HEAD", "\"${generateGitBuild()}\"")
         buildConfigField("String", "COMMITTED", "\"${allCommitted()}\"")
+        buildConfigField("String", "APPCENTER_KEY", "\"${appCenterKey()}\"")
     }
 
     flavorDimensions.add("standard")
@@ -152,6 +158,19 @@ android {
 
     //Deleting it causes a binding error
     dataBinding { enable }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs
+            .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
+            .forEach { output ->
+                var flavor = variant.productFlavors[0].name
+                if (flavor == "full") flavor = "aaps"
+                val date = SimpleDateFormat("yyMMdd").format(Date())
+                val fileName = "${flavor}-${version}-custom-${date}.apk"
+                output.outputFileName = fileName
+            }
+    }
 }
 
 allprojects {
@@ -226,7 +245,7 @@ println("-------------------")
 if (isMaster() && !gitAvailable()) {
     throw GradleException("GIT system is not available. On Windows try to run Android Studio as an Administrator. Check if GIT is installed and Studio have permissions to use it")
 }
-if (isMaster() && !allCommitted()) {
-    throw GradleException("There are uncommitted changes. Clone sources again as described in wiki and do not allow gradle update")
-}
+// if (isMaster() && !allCommitted()) {
+//     throw GradleException("There are uncommitted changes. Clone sources again as described in wiki and do not allow gradle update")
+// }
 

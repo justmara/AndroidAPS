@@ -15,4 +15,6 @@ object Versions {
 
     val javaVersion = JavaVersion.VERSION_11
     const val jacoco = "0.8.11"
+
+    const val appCenterSdk = "4.3.1"
 }
