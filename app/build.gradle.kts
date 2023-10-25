@@ -97,7 +97,7 @@ fun allCommitted(): Boolean {
 }
 
 fun appCenterKey(): String {
-    return System.getenv("APPCENTER_KEY")
+    return System.getenv("APPCENTER_KEY") ?: ""
 }
 
 android {
