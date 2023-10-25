@@ -59,7 +59,7 @@ function enable_smb(
     if (!microBolusAllowed) {
         console.error("SMB disabled (!microBolusAllowed)");
         return false;
-    } else if (!profile.allowSMB_with_high_temptarget && profile.temptargetSet && target_bg > profile.normal_target_bg) {
+    } else if (!profile.allowSMB_with_high_temptarget && profile.temptargetSet && target_bg > profile.normalTarget) {
         console.error("SMB disabled due to high temptarget of", target_bg);
         return false;
     } else if (meal_data.bwFound === true && profile.A52_risk_enable === false) {
@@ -99,7 +99,7 @@ function enable_smb(
     }
 
     // enable SMB/UAM (if enabled in preferences) if a low temptarget is set
-    if (profile.enableSMB_with_temptarget === true && (profile.temptargetSet && target_bg < profile.normal_target_bg)) {
+    if (profile.enableSMB_with_temptarget === true && (profile.temptargetSet && target_bg < profile.normalTarget)) {
         if (meal_data.bwFound) {
             console.error("Warning: SMB enabled within 6h of using Bolus Wizard: be sure to easy bolus 30s before using Bolus Wizard");
         } else {
@@ -201,7 +201,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
 
     var sensitivityRatio = 1;
     var high_temptarget_raises_sensitivity = profile.exercise_mode || profile.high_temptarget_raises_sensitivity;
-    var normalTarget = profile.normal_target_bg; // evaluate high/low temptarget against 100, not scheduled target (which might change)
+    var normalTarget = profile.normalTarget; // evaluate high/low temptarget against 100, not scheduled target (which might change)
     var halfBasalTarget = (profile.half_basal_exercise_target) ? profile.half_basal_exercise_target : 160;
     // when temptarget is 160 mg/dL, run 50% basal (120 = 75%; 140 = 60%)
     // 80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
@@ -847,8 +847,8 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
 
     // min_bg of 90 -> threshold of 65, 100 -> 70 110 -> 75, and 130 -> 85
     //var threshold = Math.max(min_bg - 0.5*(min_bg-40),72); // minimum 72
-//    var threshold = Math.max(min_bg-0.5*(min_bg-40), profile.normal_target_bg-9, 75); // minimum 75 or current profile target - 10
-    var threshold = (ENWindowOK || ENSleepModeNoSMB ? Math.max(min_bg - 0.5 * (min_bg - 40), 75) : Math.max(profile.normal_target_bg - 13, 75)); // minimum 75 or current profile target - 13
+//    var threshold = Math.max(min_bg-0.5*(min_bg-40), profile.normalTarget-9, 75); // minimum 75 or current profile target - 10
+    var threshold = (ENWindowOK || ENSleepModeNoSMB ? Math.max(min_bg - 0.5 * (min_bg - 40), 75) : Math.max(profile.normalTarget - 13, 75)); // minimum 75 or current profile target - 13
 
     //console.error(reservoir_data);
 
