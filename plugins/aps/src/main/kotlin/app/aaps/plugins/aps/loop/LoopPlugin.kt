@@ -257,7 +257,13 @@ class LoopPlugin @Inject constructor(
             if (pump.baseBasalRate < 0.01) return
             val usedAPS = activePlugin.activeAPS
             if (usedAPS.isEnabled()) {
-                usedAPS.invoke(initiator, tempBasalFallback)
+                try {
+                    usedAPS.invoke(initiator, tempBasalFallback)
+                }
+                catch (e :Exception){
+                    aapsLogger.error(LTag.APS, "Loop run failed", e )
+                    throw e
+                }
                 apsResult = usedAPS.lastAPSResult
             }
 
