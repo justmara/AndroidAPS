@@ -87,6 +87,7 @@ class BoostPlugin @Inject constructor(
             .preferencesId(R.xml.pref_boost)
             .description(R.string.description_Boost)
             .setDefault(false)
+            .showInList(false)
     }
 
     // last values

@@ -84,6 +84,8 @@ class ENPlugin @Inject constructor(
             .shortName(R.string.en_shortname)
             .preferencesId(R.xml.pref_eatingnow)
             .description(R.string.description_EN)
+            .setDefault(false)
+            .showInList(false)
     }
 
     // last values
