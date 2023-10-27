@@ -30,6 +30,8 @@
     <string name="dynamic_isf_enable" translatable="false">Use Dynamic ISF</string>
     <string name="dynamic_isf_use_tdd" translatable="false">Use TDD-based ISF</string>
     <string name="dynamic_isf_tdd_adjust_title" formatted="false">TDD-based ISF adjustment factor %</string>
+    <string name="dynamic_isf_tdd_quick" translatable="false">Use quicker-reacting TDD8h routine</string>
+    <string name="dynamic_isf_tdd_quick_summary" translatable="false">If TDDlast8h is lower than 0.75/tdd7d - use it to additionally adjust ISF for quicker reaction. Affects mostly morning routine.</string>
     <string name="dynamic_isf_tdd_adjust_summary" formatted="false">Adjustment factor for TDD-based ISF. Controls the portion of TDD used for calculation. Set more than 100% for more aggressive correction doses, and less than 100% for less aggressive corrections.</string>
     <string name="dynamic_isf_velocity_title" formatted="false">BG-based Scaling velocity %</string>
     <string name="dynamic_isf_velocity_summary" formatted="false">This controls how hard ISF will be changed with BG level change</string>

@@ -79,6 +79,14 @@
                 android:key="@string/key_dynamic_isf_use_tdd"
                 android:title="@string/dynamic_isf_use_tdd" />
 
+
+            <SwitchPreference
+                android:dependency="@string/key_dynamic_isf_enable"
+                android:defaultValue="true"
+                android:key="@string/key_dynamic_isf_tdd_quick"
+                android:title="@string/dynamic_isf_tdd_quick"
+                android:summary="@string/dynamic_isf_tdd_quick_summary"/>
+
             <app.aaps.core.validators.ValidatingEditTextPreference
                 android:dependency="@string/key_dynamic_isf_use_tdd"
                 android:defaultValue="100"

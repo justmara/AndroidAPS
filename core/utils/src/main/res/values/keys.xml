@@ -172,6 +172,7 @@
 
     <string name="key_dynamic_isf_enable" translatable="false">dynamic_isf_enable</string>
     <string name="key_dynamic_isf_use_tdd" translatable="false">dynamic_isf_use_tdd</string>
+    <string name="key_dynamic_isf_tdd_quick" translatable="false">dynamic_isf_tdd_quick</string>
     <string name="key_dynamic_isf_tdd_adjust" translatable="false">dynamic_isf_tdd_adjust</string>
     <string name="key_dynamic_isf_velocity" translatable="false">dynamic_isf_velocity</string>
     <string name="key_dynamic_isf_bg_cap" translatable="false">dynamic_isf_bg_cap</string>
