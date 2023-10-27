@@ -83,7 +83,7 @@ android {
                 var flavor = variant.productFlavors[0].name
                 if (flavor == "full") flavor = "aaps"
                 val date = SimpleDateFormat("yyMMdd").format(Date())
-                val fileName = "wear-${flavor}-${version}-custom-${date}.apk"
+                val fileName = "wear-${flavor}-${version}-customp-${date}.apk"
                 output.outputFileName = fileName
             }
     }
