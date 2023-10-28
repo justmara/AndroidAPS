@@ -3,6 +3,7 @@ package app.aaps.plugins.aps.openAPSSMBDynamicISF
 import android.content.Context
 import app.aaps.annotations.OpenForTesting
 import app.aaps.core.interfaces.aps.DetermineBasalAdapter
+import app.aaps.core.interfaces.aps.DynamicISFPlugin
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
 import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
@@ -15,12 +16,10 @@ import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.sharedPreferences.SP
-import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.HardLimits
 import app.aaps.database.impl.AppRepository
 import app.aaps.plugins.aps.R
-import app.aaps.plugins.aps.openAPSSMB.DetermineBasalAdapterSMBJS
 import app.aaps.plugins.aps.openAPSSMB.OpenAPSSMBPlugin
 import app.aaps.plugins.aps.utils.ScriptReader
 import dagger.android.HasAndroidInjector
@@ -63,7 +62,7 @@ class OpenAPSSMBDynamicISFPlugin @Inject constructor(
     repository,
     glucoseStatusProvider,
     bgQualityCheck
-) {
+), DynamicISFPlugin {
 
     init {
         pluginDescription

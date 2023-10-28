@@ -37,7 +37,7 @@ class IsfCalculatorImpl @Inject constructor(
         val halfBasalTarget = SMBDefaults.half_basal_exercise_target
         val obeyProfile = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_obey_profile, true)
 
-        val useDynIsf = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, false)
+        val useDynIsf = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, true)
         val useTDD = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_use_tdd, false)
         val adjustSens = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_adjust_sensitivity, false)
 

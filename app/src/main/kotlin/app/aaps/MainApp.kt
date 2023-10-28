@@ -42,7 +42,6 @@ import app.aaps.implementation.lifecycle.ProcessLifecycleListener
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.implementation.receivers.NetworkChangeReceiver
 import app.aaps.plugins.aps.utils.StaticInjector
-import app.aaps.plugins.aps.Boost.StepService
 import app.aaps.plugins.main.general.overview.notifications.NotificationStore
 import app.aaps.plugins.main.general.themes.ThemeSwitcherPlugin
 import app.aaps.receivers.BTReceiver
@@ -166,13 +165,6 @@ class MainApp : DaggerApplication() {
                 Widget.updateWidget(this@MainApp, "ScheduleEveryMin")
             }
             handler.postDelayed(refreshWidget, 60000)
-            config.appInitialized = true
-
-
-            val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-            val stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-            sensorManager.registerListener(StepService, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
-
         }
     }
 
