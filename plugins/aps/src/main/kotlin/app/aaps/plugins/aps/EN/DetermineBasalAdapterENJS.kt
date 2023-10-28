@@ -268,6 +268,9 @@ var getIsfByProfile = function (bg, profile) {
         this.profile.put("EN_max_iob_allow_smb", sp.getBoolean(R.string.key_en_max_iob_allow_smb, true))
         this.profile.put("enableGhostCOB", sp.getBoolean(R.string.key_use_ghostcob, false))
         this.profile.put("enableGhostCOBAlways", sp.getBoolean(R.string.key_use_ghostcob_always, false))
+        val minCOB = sp.getInt(R.string.key_mincob, 0)
+        this.profile.put("minCOB", minCOB)
+
 
         this.profile.put("allowENWovernight", sp.getBoolean(R.string.key_use_enw_overnight, false))
         //this.profile.put("COBWindow", sp.getInt(R.string.key_eatingnow_cobboostminutes, 0))
@@ -305,7 +308,7 @@ var getIsfByProfile = function (bg, profile) {
         // this.profile.put("SMBbgOffset_day", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_smbbgoffset_day, 0.0),profileFunction.getUnits()))
         this.profile.put("SMBbgOffset_day",profileUtil.convertToMgdl(sp.getDouble(R.string.key_eatingnow_smbbgoffset_day, 0.0), profileFunction.getUnits()))
         this.profile.put("ISFbgscaler", sp.getDouble(R.string.key_eatingnow_isfbgscaler, 0.0))
-        this.profile.put("MaxISFpct", sp.getInt(R.string.key_eatingnow_maxisfpct, 100))
+        this.profile.put("MaxISFpct", sp.getInt(R.string.key_eatingnow_maxisfpct, 0))
         this.profile.put("useDynISF", sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, true))
 
         this.profile.put("percent", if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100)
@@ -338,8 +341,8 @@ var getIsfByProfile = function (bg, profile) {
         this.mealData.put("mealCOB", mealData.mealCOB)
         this.mealData.put("slopeFromMaxDeviation", mealData.slopeFromMaxDeviation)
         this.mealData.put("slopeFromMinDeviation", mealData.slopeFromMinDeviation)
-        this.mealData.put("lastBolusTime", mealData.lastBolusTime)
-        this.mealData.put("lastBolusUnits", repository.getLastBolusRecord()?.amount ?: 0L) // EatingNow
+        // this.mealData.put("lastBolusTime", mealData.lastBolusTime)
+        // this.mealData.put("lastBolusUnits", repository.getLastBolusRecord()?.amount ?: 0L) // EatingNow
         this.mealData.put("lastCarbTime", mealData.lastCarbTime)
 
         // set the EN start time based on prefs
@@ -351,7 +354,7 @@ var getIsfByProfile = function (bg, profile) {
         var ENStartedArray: Array<Long> = arrayOf() // Create array to contain first treatment times for ENStartTime for today
 
         // get the FIRST and LAST carb time since EN activation NEW
-        repository.getCarbsDataFromTimeToTime(ENStartTime,now,false).blockingGet().let { ENCarbs->
+        repository.getCarbsDataFromTimeToTime(ENStartTime,now,false, minCOB).blockingGet().let { ENCarbs->
             val firstENCarbTime = with(ENCarbs.firstOrNull()?.timestamp) { this ?: 0 }
             this.mealData.put("firstENCarbTime",firstENCarbTime)
             if (firstENCarbTime >0) ENStartedArray += firstENCarbTime
@@ -406,7 +409,6 @@ var getIsfByProfile = function (bg, profile) {
 
         // get the TDD since ENW Start
         this.mealData.put("ENWStartTime", ENWStartTime)
-        this.mealData.put("ENWTDD", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now, false)?.bolusAmount ?: 0 else 0)
         // this.mealData.put("ENWBolusIOB", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculateDaily(ENWStartTime, now)?.bolusAmount else 0)
 
         var ENWBolusIOB = if (now < ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now, allowMissingData = true)?.totalAmount else 0
@@ -442,7 +444,6 @@ var getIsfByProfile = function (bg, profile) {
             sp.putLong("TDDLastUpdate", now)
         }
 
-
         // use stored value where appropriate
         var TDDAvg7d = sp.getDouble("TDDAvg7d", ((basalRate * 12)*100)/21)
 
@@ -454,14 +455,18 @@ var getIsfByProfile = function (bg, profile) {
         // }
 
         var TDDLast4h = tddCalculator.calculateDaily(-4, 0)?.totalAmount
+        var TDDLast8h = tddCalculator.calculateDaily(-8, 0)?.totalAmount
         var TDDLast8hfor4h = tddCalculator.calculateDaily(-8, -4)?.totalAmount
 
         if (TDDAvg1d == null || TDDAvg1d < basalRate * 12) TDDAvg1d = ((basalRate * 12)*100)/21
         if (TDDLast4h == null) TDDLast4h = (TDDAvg1d / 6)
+        if (TDDLast8h == null) TDDLast8h = (TDDAvg1d / 3)
         if (TDDLast8hfor4h == null) TDDLast8hfor4h = (TDDAvg1d / 6)
 
 
         val TDDLast8_wt = (((1.4 * TDDLast4h) + (0.6 * TDDLast8hfor4h)) * 3)
+        val TDD8h_exp = (3 * TDDLast8h)
+        this.mealData.put("TDD8h_exp",TDD8h_exp)
 
         if ( TDDLast8_wt < (0.75 * TDDAvg7d)) TDDAvg7d = TDDLast8_wt + ( ( TDDLast8_wt / TDDAvg7d ) * ( TDDAvg7d - TDDLast8_wt ) )
 
@@ -479,6 +484,7 @@ var getIsfByProfile = function (bg, profile) {
 
         this.mealData.put("TDDLastCannula", TDDLastCannula)
         this.mealData.put("TDDAvg7d", TDDAvg7d)
+        this.mealData.put("TDDLastUpdate", sp.getLong("TDDLastUpdate", 0))
         // }
 
         // TIR Windows - 4 hours prior to current time - TIRB2

@@ -515,7 +515,7 @@ class AppRepository @Inject internal constructor(
 
     // Eating Now: Get the first bolus since EN Start
     fun getENBolusFromTimeOfType(timestamp: Long, ascending: Boolean, type: Bolus.Type, minbolus: Double): Single<List<Bolus>> =
-        database.bolusDao.getBolusesFromTimeOfType(type, timestamp, minbolus)
+        database.bolusDao.getENBolusesFromTimeOfType(type, timestamp, minbolus)
             .map { if (!ascending) it.reversed() else it }
             .subscribeOn(Schedulers.io())
 
@@ -610,8 +610,9 @@ class AppRepository @Inject internal constructor(
             .map { if (!ascending) it.reversed() else it }
             .subscribeOn(Schedulers.io())
 
-    fun getCarbsDataFromTimeToTime(from: Long, to: Long, ascending: Boolean): Single<List<Carbs>> =
-        database.carbsDao.getCarbsFromTimeToTime(from, to)
+    // Eating Now for carbs within ENW
+    fun getCarbsDataFromTimeToTime(from: Long, to: Long, ascending: Boolean, minCOB: Int): Single<List<Carbs>> =
+        database.carbsDao.getCarbsFromTimeToTime(from, to, minCOB)
             .map { if (!ascending) it.reversed() else it }
             .subscribeOn(Schedulers.io())
 
