@@ -165,6 +165,7 @@ class MainApp : DaggerApplication() {
                 Widget.updateWidget(this@MainApp, "ScheduleEveryMin")
             }
             handler.postDelayed(refreshWidget, 60000)
+            config.appInitialized = true
         }
     }
 
