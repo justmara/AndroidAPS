@@ -95,72 +95,38 @@ class ENTempTargetDialog : DialogFragmentWithDate() {
 
         // temp target
         context?.let { context ->
-            if (repository.getTemporaryTargetActiveAt(dateUtil.now()).blockingGet() is ValueWrapper.Existing)
+            if (repository.getTemporaryTargetActiveAt(dateUtil.now()).blockingGet() is ValueWrapper.Existing) {
                 binding.targetCancel.visibility = View.VISIBLE
-            else
+                binding.prebolus.visibility = View.GONE // no prebolus checkbox when cancelling TT
+            } else
                 binding.targetCancel.visibility = View.GONE
 
             reasonList = Lists.newArrayList(
-                rh.gs(R.string.manual),
-                rh.gs(R.string.eatingsoon),
                 rh.gs(R.string.eatingnow),
-                rh.gs(R.string.activity),
-                rh.gs(R.string.hypo)
+                rh.gs(R.string.eatingnow_prebolus)
             )
             binding.reasonList.setAdapter(ArrayAdapter(context, R.layout.spinner_centered, reasonList))
 
             binding.targetCancel.setOnClickListener { binding.duration.value = 0.0; shortClick(it) }
-            binding.eatingSoon.setOnClickListener { shortClick(it) }
-            binding.activity.setOnClickListener { shortClick(it) }
-            binding.hypo.setOnClickListener { shortClick(it) }
-
-            binding.eatingSoon.setOnLongClickListener {
-                longClick(it)
-                return@setOnLongClickListener true
-            }
-            binding.activity.setOnLongClickListener {
-                longClick(it)
-                return@setOnLongClickListener true
-            }
-            binding.hypo.setOnLongClickListener {
-                longClick(it)
-                return@setOnLongClickListener true
-            }
             binding.durationLabel.labelFor = binding.duration.editTextId
             binding.temptargetLabel.labelFor = binding.temptarget.editTextId
         }
 
         // reset to Eating Now defaults
-        //binding.temptarget.value = Profile.toCurrentUnits(units,profileFunction.getProfile()!!.getTargetMgdl())
         binding.duration.value = defaultValueHelper.determineEatingNowTTDuration().toDouble()
         binding.reasonList.setText(rh.gs(R.string.eatingnow), false)
+        // binding.prebolus.isChecked = false
+
+        // when the prebolus button is pressed
+        binding.prebolus.setOnClickListener {
+            if (binding.prebolus.isChecked) binding.reasonList.setText(rh.gs(R.string.eatingnow_prebolus), false)
+            else binding.reasonList.setText(rh.gs(R.string.eatingnow), false)
+        }
     }
 
     private fun shortClick(v: View) {
         v.performLongClick()
         if (submit()) dismiss()
-    }
-
-    private fun longClick(v: View) {
-        when (v.id) {
-            app.aaps.ui.R.id.eating_soon -> {
-                binding.temptarget.value = defaultValueHelper.determineEatingSoonTT()
-                binding.duration.value = defaultValueHelper.determineEatingSoonTTDuration().toDouble()
-                binding.reasonList.setText(rh.gs(R.string.eatingsoon), false)
-            }
-
-            app.aaps.ui.R.id.activity    -> {
-                binding.temptarget.value = defaultValueHelper.determineActivityTT()
-                binding.duration.value = defaultValueHelper.determineActivityTTDuration().toDouble()
-                binding.reasonList.setText(rh.gs(R.string.activity), false)
-            }
-
-            app.aaps.ui.R.id.hypo        -> {
-                binding.temptarget.value = defaultValueHelper.determineHypoTT()
-                binding.duration.value = defaultValueHelper.determineHypoTTDuration().toDouble()
-                binding.reasonList.setText(rh.gs(R.string.hypo), false)
-            }
-        }
     }
 
     override fun onDestroyView() {
@@ -197,34 +163,13 @@ class ENTempTargetDialog : DialogFragmentWithDate() {
                         ), ValueWithUnit.fromGlucoseUnit(target, units.asText), ValueWithUnit.Minute(duration)
                     )
 
-                    rh.gs(app.aaps.core.ui.R.string.eatingsoon) -> uel.log(
+                    rh.gs(app.aaps.core.ui.R.string.eatingnow_prebolus)     -> uel.log(
                         UserEntry.Action.TT, UserEntry.Sources.TTDialog, ValueWithUnit.Timestamp(eventTime).takeIf { eventTimeChanged }, ValueWithUnit.TherapyEventTTReason(
-                            TemporaryTarget.Reason.EATING_SOON
+                            TemporaryTarget.Reason.EATING_NOW_PB
                         ), ValueWithUnit.fromGlucoseUnit(target, units.asText), ValueWithUnit.Minute(duration)
                     )
 
-                    rh.gs(app.aaps.core.ui.R.string.activity) -> uel.log(
-                        UserEntry.Action.TT, UserEntry.Sources.TTDialog, ValueWithUnit.Timestamp(eventTime).takeIf { eventTimeChanged }, ValueWithUnit.TherapyEventTTReason(
-                            TemporaryTarget.Reason.ACTIVITY
-                        ), ValueWithUnit.fromGlucoseUnit(target, units.asText), ValueWithUnit.Minute(duration)
-                    )
-
-                    rh.gs(app.aaps.core.ui.R.string.hypo) -> uel.log(
-                        UserEntry.Action.TT, UserEntry.Sources.TTDialog, ValueWithUnit.Timestamp(eventTime).takeIf { eventTimeChanged }, ValueWithUnit.TherapyEventTTReason(
-                            TemporaryTarget.Reason.HYPOGLYCEMIA
-                        ), ValueWithUnit.fromGlucoseUnit(target, units.asText), ValueWithUnit.Minute(duration)
-                    )
-
-                    rh.gs(app.aaps.core.ui.R.string.manual) -> uel.log(
-                        UserEntry.Action.TT, UserEntry.Sources.TTDialog, ValueWithUnit.Timestamp(eventTime).takeIf { eventTimeChanged }, ValueWithUnit.TherapyEventTTReason(
-                            TemporaryTarget.Reason.CUSTOM
-                        ), ValueWithUnit.fromGlucoseUnit(target, units.asText), ValueWithUnit.Minute(duration)
-                    )
-
-                    rh.gs(app.aaps.core.ui.R.string.stoptemptarget) -> uel.log(
-                        UserEntry.Action.CANCEL_TT,
-                        UserEntry.Sources.TTDialog,
-                        ValueWithUnit.Timestamp(eventTime).takeIf { eventTimeChanged })
+                    rh.gs(app.aaps.core.ui.R.string.stoptemptarget) -> uel.log(UserEntry.Action.CANCEL_TT, UserEntry.Sources.TTDialog, ValueWithUnit.Timestamp(eventTime).takeIf { eventTimeChanged })
                 }
                 if (target == 0.0 || duration == 0) {
                     disposable += repository.runTransactionForResult(CancelCurrentTemporaryTargetIfAnyTransaction(eventTime))
@@ -234,14 +179,13 @@ class ENTempTargetDialog : DialogFragmentWithDate() {
                             aapsLogger.error(LTag.DATABASE, "Error while saving temporary target", it)
                         })
                 } else {
-                    disposable += repository.runTransactionForResult(InsertAndCancelCurrentTemporaryTargetTransaction(
+                    disposable += repository.runTransactionForResult(
+                        InsertAndCancelCurrentTemporaryTargetTransaction(
                         timestamp = eventTime,
                         duration = TimeUnit.MINUTES.toMillis(duration.toLong()),
                         reason = when (reason) {
-                            rh.gs(R.string.eatingnow) -> TemporaryTarget.Reason.EATING_NOW
-                            rh.gs(R.string.eatingsoon) -> TemporaryTarget.Reason.EATING_SOON
-                            rh.gs(R.string.activity)   -> TemporaryTarget.Reason.ACTIVITY
-                            rh.gs(R.string.hypo)       -> TemporaryTarget.Reason.HYPOGLYCEMIA
+                                rh.gs(R.string.eatingnow) -> TemporaryTarget.Reason.EATING_NOW
+                                rh.gs(R.string.eatingnow_prebolus) -> TemporaryTarget.Reason.EATING_NOW_PB
                             else                            -> TemporaryTarget.Reason.CUSTOM
                         },
                         lowTarget = profileUtil.convertToMgdl(target, profileFunction.getUnits()),
@@ -268,8 +212,8 @@ class ENTempTargetDialog : DialogFragmentWithDate() {
             activity?.let { activity ->
                 val cancelFail = {
                     queryingProtection = false
-                    aapsLogger.debug(LTag.APS, "Dialog canceled on resume protection: ${this.javaClass.name}")
-                    ToastUtils.showToastInUiThread(ctx, rh.gs(app.aaps.ui.R.string.dialog_canceled))
+                    aapsLogger.debug(LTag.APS, "Dialog canceled on resume protection: ${this.javaClass.simpleName}")
+                    ToastUtils.warnToast(ctx, app.aaps.ui.R.string.dialog_canceled)
                     dismiss()
                 }
                 protectionCheck.queryProtection(activity, ProtectionCheck.Protection.BOLUS, { queryingProtection = false }, cancelFail, cancelFail)

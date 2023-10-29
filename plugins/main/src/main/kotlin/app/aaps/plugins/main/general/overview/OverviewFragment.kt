@@ -56,6 +56,7 @@ import app.aaps.core.interfaces.rx.events.EventAcceptOpenLoopChange
 import app.aaps.core.interfaces.rx.events.EventBucketedDataCreated
 import app.aaps.core.interfaces.rx.events.EventEffectiveProfileSwitchChanged
 import app.aaps.core.interfaces.rx.events.EventExtendedBolusChange
+import app.aaps.core.interfaces.rx.events.EventInitializationChanged
 import app.aaps.core.interfaces.rx.events.EventMobileToWear
 import app.aaps.core.interfaces.rx.events.EventNewOpenLoopNotification
 import app.aaps.core.interfaces.rx.events.EventPreferenceChange
@@ -310,6 +311,10 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                            overviewData.pumpStatus = it.getStatus(requireContext())
                            updatePumpStatus()
                        }, fabricPrivacy::logException)
+        disposable += rxBus
+            .toObservable(EventInitializationChanged::class.java)
+            .observeOn(aapsSchedulers.main)
+            .subscribe({ processButtonsVisibility() }, fabricPrivacy::logException)
         disposable += rxBus
             .toObservable(EventEffectiveProfileSwitchChanged::class.java)
             .observeOn(aapsSchedulers.io)
@@ -797,7 +802,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         val lastBgDescription = overviewData.lastBgDescription(iobCobCalculator.ads)
         runOnUiThread {
             _binding ?: return@runOnUiThread
-            binding.infoLayout.bg.text = profileUtil.fromMgdlToStringInUnits(lastBg?.value)
+            binding.infoLayout.bg.text = profileUtil.fromMgdlToStringInUnits(lastBg?.recalculated)
             binding.infoLayout.bg.setTextColor(lastBgColor)
             trendArrow?.let { binding.infoLayout.arrow.setImageResource(it.directionToIcon()) }
             binding.infoLayout.arrow.visibility = (trendArrow != null).toVisibilityKeepSpace()

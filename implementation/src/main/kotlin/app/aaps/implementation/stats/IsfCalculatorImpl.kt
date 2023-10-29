@@ -39,6 +39,7 @@ class IsfCalculatorImpl @Inject constructor(
 
         val useDynIsf = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, true)
         val useTDD = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_use_tdd, false)
+        val useTDDquick = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_tdd_quick, true)
         val adjustSens = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_adjust_sensitivity, false)
 
         val globalScale = 100.0 / if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100
@@ -86,7 +87,9 @@ class IsfCalculatorImpl @Inject constructor(
                         val tddLast8to4H = tddCalculator.calculateDaily(-8, -4)?.totalAmount ?: 0.0
                         val tddWeightedFromLast8H = ((1.4 * tddLast4H) + (0.6 * tddLast8to4H)) * 3
                         var tdd =
-                            if (tdd1D != null) (tddWeightedFromLast8H * 0.33) + (tdd7D * 0.34) + (tdd1D * 0.33)
+                            if (tdd1D != null)
+                                if (useTDDquick && tddWeightedFromLast8H < (0.75 * tdd7D)) ((tddWeightedFromLast8H +( (tddWeightedFromLast8H / tdd7D) * ( tdd7D - tddWeightedFromLast8H))) * 0.34 ) + (tdd1D * 0.33) + (tddWeightedFromLast8H * 0.33)
+                                else (tddWeightedFromLast8H * 0.33) + (tdd7D * 0.34) + (tdd1D * 0.33)
                             else tddWeightedFromLast8H
 
                         jsLogger.debug("TDD: ${Round.roundTo(tdd, 0.01)}")
@@ -113,7 +116,7 @@ class IsfCalculatorImpl @Inject constructor(
                     else jsLogger.debug("tdd7D not found, falling back to profile sensNormalTarget of $sensNormalTarget")
                 }
 
-                val bgTarget = profile.getTargetMgdl();
+                val bgTarget = profile.getTargetMgdl()
                 if (isTempTarget && ((highTemptargetRaisesSensitivity && bgTarget > bgNormalTarget) || (lowTemptargetLowersSensitivity && bgTarget < bgNormalTarget))) {
                     val c = halfBasalTarget - bgNormalTarget
                     ratio = c / (c + bgTarget - bgNormalTarget)
