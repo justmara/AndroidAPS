@@ -1,15 +1,20 @@
 package app.aaps.plugins.sensitivity
 
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceScreen
 import app.aaps.annotations.OpenForTesting
 import app.aaps.core.interfaces.aps.AutosensDataStore
 import app.aaps.core.interfaces.aps.AutosensResult
+import app.aaps.core.interfaces.aps.DynamicISFPlugin
 import app.aaps.core.interfaces.aps.SMBDefaults
 import app.aaps.core.interfaces.aps.Sensitivity.SensitivityType
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.Constants
 import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.PluginConstraints
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.plugin.PluginType
 import app.aaps.core.interfaces.profile.ProfileFunction
@@ -39,7 +44,9 @@ class SensitivityOref1Plugin @Inject constructor(
     sp: SP,
     private val profileFunction: ProfileFunction,
     private val dateUtil: DateUtil,
-    private val repository: AppRepository
+    private val repository: AppRepository,
+    private val activePlugin: ActivePlugin,
+    private val config: Config,
 ) : AbstractSensitivityPlugin(
     PluginDescription()
         .mainType(PluginType.SENSITIVITY)
@@ -262,5 +269,11 @@ class SensitivityOref1Plugin @Inject constructor(
     override fun isUAMEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
         if (!isEnabled()) value.set(false, rh.gs(R.string.uam_disabled_oref1_not_selected), this)
         return value
+    }
+
+    override fun preprocessPreferences(preferenceFragment: PreferenceFragmentCompat) {
+        super.preprocessPreferences(preferenceFragment)
+
+        preferenceFragment.findPreference<PreferenceScreen>(rh.gs(R.string.key_absorption_oref1_dynamic_isf))?.let { it.isVisible = !config.NSCLIENT && activePlugin.activeAPS is DynamicISFPlugin }
     }
 }

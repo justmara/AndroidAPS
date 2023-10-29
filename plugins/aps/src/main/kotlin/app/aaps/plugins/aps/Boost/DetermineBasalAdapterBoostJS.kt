@@ -161,7 +161,7 @@ var getIsfByProfile = function (bg, profile, useCap) {
                 aapsLogger.error(LTag.APS, "Problem loading JS Functions")
             }
         } catch (e: IOException) {
-            aapsLogger.error(LTag.APS, "IOException")
+            aapsLogger.error(LTag.APS, "IOException: $e")
         } catch (e: RhinoException) {
             aapsLogger.error(LTag.APS, "RhinoException: (" + e.lineNumber() + "," + e.columnNumber() + ") " + e.toString())
         } catch (e: IllegalAccessException) {

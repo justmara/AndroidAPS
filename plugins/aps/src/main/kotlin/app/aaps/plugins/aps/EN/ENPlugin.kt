@@ -8,6 +8,7 @@ import app.aaps.core.interfaces.aps.AutosensResult
 import dagger.android.HasAndroidInjector
 import app.aaps.core.interfaces.aps.ENDefaults
 import app.aaps.core.interfaces.aps.DetermineBasalAdapter
+import app.aaps.core.interfaces.aps.DynamicISFPlugin
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
 import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
@@ -74,7 +75,7 @@ class ENPlugin @Inject constructor(
     repository,
     glucoseStatusProvider,
     bgQualityCheck
-) {
+), DynamicISFPlugin {
     init{
         pluginDescription
             .mainType(PluginType.APS)
@@ -228,9 +229,9 @@ class ENPlugin @Inject constructor(
                 flatBGsDetected
             )
             val now = System.currentTimeMillis()
-            val determineBasalResultEN = determineBasalAdapterENJS.invoke()
+            val determineBasalResult = determineBasalAdapterENJS.invoke()
             profiler.log(LTag.APS, "SMB calculation", start)
-            if (determineBasalResultEN == null) {
+            if (determineBasalResult == null) {
                 aapsLogger.error(LTag.APS, "SMB calculation returned null")
                 lastDetermineBasalAdapter = null
                 lastAPSResult = null
@@ -238,12 +239,12 @@ class ENPlugin @Inject constructor(
             } else {
                 // TODO still needed with oref1?
                 // Fix bug determine basal
-                if (determineBasalResultEN.rate == 0.0 && determineBasalResultEN.duration == 0 && iobCobCalculator.getTempBasalIncludingConvertedExtended(dateUtil.now()) == null) determineBasalResultEN.isTempBasalRequested = false
-                determineBasalResultEN.iob = iobArray[0]
-                determineBasalResultEN.json?.put("timestamp", dateUtil.toISOString(now))
-                determineBasalResultEN.inputConstraints = inputConstraints
+                if (determineBasalResult.rate == 0.0 && determineBasalResult.duration == 0 && iobCobCalculator.getTempBasalIncludingConvertedExtended(dateUtil.now()) == null) determineBasalResult.isTempBasalRequested = false
+                determineBasalResult.iob = iobArray[0]
+                determineBasalResult.json?.put("timestamp", dateUtil.toISOString(now))
+                determineBasalResult.inputConstraints = inputConstraints
                 lastDetermineBasalAdapter = determineBasalAdapterENJS
-                lastAPSResult = determineBasalResultEN as DetermineBasalResultSMB
+                lastAPSResult = determineBasalResult as DetermineBasalResultSMB
                 lastAPSRun = now
             }
         }

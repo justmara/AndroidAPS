@@ -38,7 +38,9 @@
     <string name="key_smscommunicator_settings" translatable="false">smscommunicator_settings</string>
     <string name="key_openapssmb_settings" translatable="false">openapssmb_settings</string>
     <string name="key_treatmentssafety_settings" translatable="false">treatmentssafety_settings</string>
+
     <!-- Night mode -->
+    <string name="key_treatment_safety_night_mode" translatable="false">treatment_safety_night_mode</string>
     <string name="key_treatment_safety_night_mode_enabled" translatable="false">treatment_safety_night_mode_enabled</string>
     <string name="key_treatment_safety_night_mode_bg_offset" translatable="false">treatment_safety_night_mode_bg_offset</string>
     <string name="key_treatment_safety_night_mode_start" translatable="false">treatment_safety_night_mode_start</string>

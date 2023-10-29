@@ -8,6 +8,7 @@ import app.aaps.core.interfaces.aps.AutosensResult
 import dagger.android.HasAndroidInjector
 import app.aaps.core.interfaces.aps.BoostDefaults
 import app.aaps.core.interfaces.aps.DetermineBasalAdapter
+import app.aaps.core.interfaces.aps.DynamicISFPlugin
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.Constraint
@@ -76,7 +77,7 @@ class BoostPlugin @Inject constructor(
     repository,
     glucoseStatusProvider,
     bgQualityCheck
-) {
+), DynamicISFPlugin {
     init {
         pluginDescription
             .mainType(PluginType.APS)
@@ -238,7 +239,7 @@ class BoostPlugin @Inject constructor(
                 flatBGsDetected
             )
             val now = System.currentTimeMillis()
-            val determineBasalResult = determineBasalAdapterBoostJS.invoke() as DetermineBasalResultSMB
+            val determineBasalResult = determineBasalAdapterBoostJS.invoke()
             profiler.log(LTag.APS, "SMB calculation", start)
             if (determineBasalResult == null) {
                 aapsLogger.error(LTag.APS, "SMB calculation returned null")
@@ -254,7 +255,7 @@ class BoostPlugin @Inject constructor(
                 determineBasalResult.json?.put("timestamp", dateUtil.toISOString(now))
                 determineBasalResult.inputConstraints = inputConstraints
                 lastDetermineBasalAdapter = determineBasalAdapterBoostJS
-                lastAPSResult = determineBasalResult
+                lastAPSResult = determineBasalResult as DetermineBasalResultSMB
                 lastAPSRun = now
             }
         }
