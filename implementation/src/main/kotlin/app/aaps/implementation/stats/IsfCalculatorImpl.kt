@@ -39,7 +39,7 @@ class IsfCalculatorImpl @Inject constructor(
 
         val useDynIsf = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, true)
         val useTDD = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_use_tdd, false)
-        val useTDDquick = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_tdd_quick, true)
+        val useTDDquick = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_tdd_quick, false)
         val adjustSens = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_adjust_sensitivity, false)
 
         val globalScale = 100.0 / if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100
