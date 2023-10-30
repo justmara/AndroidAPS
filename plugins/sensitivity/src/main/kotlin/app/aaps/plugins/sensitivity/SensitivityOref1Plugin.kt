@@ -1,15 +1,14 @@
 package app.aaps.plugins.sensitivity
 
-import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceScreen
-import androidx.preference.SwitchPreference
 import app.aaps.annotations.OpenForTesting
 import app.aaps.core.interfaces.aps.AutosensDataStore
 import app.aaps.core.interfaces.aps.AutosensResult
 import app.aaps.core.interfaces.aps.DynamicISFPlugin
 import app.aaps.core.interfaces.aps.SMBDefaults
 import app.aaps.core.interfaces.aps.Sensitivity.SensitivityType
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.Constants
 import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.PluginConstraints
@@ -48,6 +47,7 @@ class SensitivityOref1Plugin @Inject constructor(
     private val dateUtil: DateUtil,
     private val repository: AppRepository,
     private val activePlugin: ActivePlugin,
+    private val config: Config,
 ) : AbstractSensitivityPlugin(
     PluginDescription()
         .mainType(PluginType.SENSITIVITY)
@@ -275,9 +275,6 @@ class SensitivityOref1Plugin @Inject constructor(
     override fun preprocessPreferences(preferenceFragment: PreferenceFragmentCompat) {
         super.preprocessPreferences(preferenceFragment)
 
-        val dynIsfPref = preferenceFragment.findPreference<PreferenceScreen>("absorption_oref1_dynamic_isf")
-        dynIsfPref?.let {
-            it -> it.isVisible = activePlugin.activeAPS is DynamicISFPlugin
-        }
+        preferenceFragment.findPreference<PreferenceScreen>(rh.gs(R.string.key_absorption_oref1_dynamic_isf))?.let { it.isVisible = !config.NSCLIENT && activePlugin.activeAPS is DynamicISFPlugin }
     }
 }

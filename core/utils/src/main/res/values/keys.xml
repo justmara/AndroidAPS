@@ -38,7 +38,9 @@
     <string name="key_smscommunicator_settings" translatable="false">smscommunicator_settings</string>
     <string name="key_openapssmb_settings" translatable="false">openapssmb_settings</string>
     <string name="key_treatmentssafety_settings" translatable="false">treatmentssafety_settings</string>
+
     <!-- Night mode -->
+    <string name="key_treatment_safety_night_mode" translatable="false">treatment_safety_night_mode</string>
     <string name="key_treatment_safety_night_mode_enabled" translatable="false">treatment_safety_night_mode_enabled</string>
     <string name="key_treatment_safety_night_mode_bg_offset" translatable="false">treatment_safety_night_mode_bg_offset</string>
     <string name="key_treatment_safety_night_mode_start" translatable="false">treatment_safety_night_mode_start</string>
@@ -167,6 +169,7 @@
     <string name="key_virtual_pump_upload_status" translatable="false">virtualpump_uploadstatus</string>
     <string name="key_use_autosens" translatable="false">openapsama_useautosens</string>
     <string name="key_used_autosens_on_main_phone" translatable="false">used_autosens_on_main_phone</string>
+    <string name="key_openapsma_max_basal" translatable="false">openapsma_max_basal</string>
     <string name="key_Boost_settings" translatable="false">Boost_settings</string>
     <string name="key_engineering_mode" translatable="false">engineering_mode</string>
 

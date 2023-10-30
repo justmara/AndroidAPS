@@ -35,7 +35,7 @@
             validate:testType="numericRange" />
 
         <androidx.preference.PreferenceScreen
-            android:key="safety_night_mode"
+            android:key="@string/key_treatment_safety_night_mode"
             android:title="@string/treatment_safety_night_mode">
 
             <SwitchPreference

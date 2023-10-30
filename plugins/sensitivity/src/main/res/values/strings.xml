@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="key_absorption_category_settings" translatable="false">absorption_category_settings</string>
+    <string name="key_absorption_oref1_dynamic_isf" translatable="false">absorption_oref1_dynamic_isf</string>
 
     <string name="sensitivity_shortname">SENS</string>
     <string name="sensitivity_oref1">Sensitivity Oref1</string>

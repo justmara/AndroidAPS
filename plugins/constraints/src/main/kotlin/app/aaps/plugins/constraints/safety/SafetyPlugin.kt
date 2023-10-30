@@ -1,5 +1,7 @@
 package app.aaps.plugins.constraints.safety
 
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceScreen
 import app.aaps.core.interfaces.aps.ApsMode
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.Constraint
@@ -187,5 +189,11 @@ class SafetyPlugin @Inject constructor(
         configuration.storeString(app.aaps.core.utils.R.string.key_age, sp, rh)
         configuration.storeDouble(app.aaps.core.utils.R.string.key_treatmentssafety_maxbolus, sp, rh)
         configuration.storeInt(app.aaps.core.utils.R.string.key_treatmentssafety_maxcarbs, sp, rh)
+    }
+
+    override fun preprocessPreferences(preferenceFragment: PreferenceFragmentCompat) {
+        super.preprocessPreferences(preferenceFragment)
+
+        preferenceFragment.findPreference<PreferenceScreen>(rh.gs(app.aaps.core.utils.R.string.key_treatment_safety_night_mode))?.let { it.isVisible = !config.NSCLIENT }
     }
 }
