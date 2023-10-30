@@ -31,11 +31,11 @@
     <string name="dynamic_isf_tdd_quick_summary" translatable="false">Если TDD за последние 8ч ниже, чем 3/4 от среднего TDD за 7 дней - использовать его. Может помочь быстрее реагировать на резкие повышения чувствительност.</string>
     <string name="dynamic_isf_velocity_title" formatted="false">Коэффициент масштабирования с ГК, %</string>
     <string name="dynamic_isf_velocity_summary" formatted="false">Задаёт степень зависимости ДинISF от текущего уровня ГК. При 0% текущий ГК не влияет на ISF.</string>
-    <string name="dynamic_isf_velocity_dialogMessage" formatted="false">This controls how hard ISF will be changed with BG level change: 0% means no scaling at all, constant ISF value for every BG level; 100% - regular DynamicISF scaling</string>
+    <string name="dynamic_isf_velocity_dialogMessage" formatted="false">Управляет скоростью изменения ISF в зависимости от ГК: 0% означает, что ISF не меняется от уровня ГК; 100% - обычное ДинISF масштабирование.</string>
     <string name="dynamic_isf_bg_cap_title" formatted="false">Мягкий порог ГК</string>
     <string name="dynamic_isf_bg_cap_summary" formatted="false">Уровень ГК, выше которого ДинISF масштабируется на ⅓ медленнее от обычного.</string>
     <string name="dynamic_isf_bg_cap_dialogMessage" formatted="false">Задаёт уровень ГК, после которого применяется затормаживание масштабирования ISF. Каждая единица ГК выше этого порога будет учитываться как ⅓ в расчёте масштабирования ДинISF. Может использоваться для предовращения опасного снижения ISF на высоких уровнях ГК и, соответственно, перелива инсулина.</string>
-    <string name="dynamic_isf_obey_profile_title" formatted="false">Подчинаться профилю</string>
+    <string name="dynamic_isf_obey_profile_title" formatted="false">Подчиняться профилю</string>
     <string name="dynamic_isf_obey_profile_summary" formatted="false">Применять % профиля к ДинISF на основе TDD</string>
     <string name="dynamic_isf_adjust_sensitivity">Корректировать чувствительность и базал</string>
     <string name="dynamic_isf_adjust_sensitivity_summary">Если включено - ДинDynISF использует отношение TDD24ч/TDD7д в качестве коэффициента чувствительности и соответствующим образом корректирует базал. Также, как это обычно делает Автосенс.</string>
