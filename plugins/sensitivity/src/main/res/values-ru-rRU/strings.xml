@@ -20,4 +20,23 @@
     <string name="openapsama_min_5m_carb_impact_summary">Значение по умолчанию: 3.0 (AMA) или 8.0 (SMB). Эта настройка на усвоение углеводов за 5 мин. По умолчанию ожидается 3мг/дл/5мин. Влияет на скорость учета поглощения углеводов COB и усвоения в расчетах прогнозируемой гликемии, когда ГК падает быстрее или не растет так как ожидается.</string>
     <string name="absorption_cutoff_title">Максимальное время усваимости пищи [h]</string>
     <string name="absorption_cutoff_summary">Время, за которое любая еда считается усвоившейся. Оставшиеся углеводы не будут учтены.</string>
+
+    <string name="dynamic_isf">Динамический ISF</string>
+
+    <string name="dynamic_isf_enable" translatable="false">Использовать ДинISF</string>
+    <string name="dynamic_isf_use_tdd" translatable="false">Использовать ДинISF на основе TDD</string>
+    <string name="dynamic_isf_tdd_adjust_title" formatted="false">Коэффициент регулировки ДинISF на основе TDD</string>
+    <string name="dynamic_isf_tdd_adjust_summary" formatted="false">Задаёт % от TDD, который берётся для расчёта ISF. Чем выше % - тем ниже будет ISF. Выставляется выше 100% для более агрессивного поведения AAPS и меньше 100% для менее агрессивного.</string>
+    <string name="dynamic_isf_tdd_quick" translatable="false">Использовать убыстренный 8часовой цикл</string>
+    <string name="dynamic_isf_tdd_quick_summary" translatable="false">Если TDD за последние 8ч ниже, чем 3/4 от среднего TDD за 7 дней - использовать его. Может помочь быстрее реагировать на резкие повышения чувствительност.</string>
+    <string name="dynamic_isf_velocity_title" formatted="false">Коэффициент масштабирования с ГК, %</string>
+    <string name="dynamic_isf_velocity_summary" formatted="false">Задаёт степень зависимости ДинISF от текущего уровня ГК. При 0% текущий ГК не влияет на ISF.</string>
+    <string name="dynamic_isf_velocity_dialogMessage" formatted="false">Управляет скоростью изменения ISF в зависимости от ГК: 0% означает, что ISF не меняется от уровня ГК; 100% - обычное ДинISF масштабирование.</string>
+    <string name="dynamic_isf_bg_cap_title" formatted="false">Мягкий порог ГК</string>
+    <string name="dynamic_isf_bg_cap_summary" formatted="false">Уровень ГК, выше которого ДинISF масштабируется на ⅓ медленнее от обычного.</string>
+    <string name="dynamic_isf_bg_cap_dialogMessage" formatted="false">Задаёт уровень ГК, после которого применяется затормаживание масштабирования ISF. Каждая единица ГК выше этого порога будет учитываться как ⅓ в расчёте масштабирования ДинISF. Может использоваться для предовращения опасного снижения ISF на высоких уровнях ГК и, соответственно, перелива инсулина.</string>
+    <string name="dynamic_isf_obey_profile_title" formatted="false">Подчиняться профилю</string>
+    <string name="dynamic_isf_obey_profile_summary" formatted="false">Применять % профиля к ДинISF на основе TDD</string>
+    <string name="dynamic_isf_adjust_sensitivity">Корректировать чувствительность и базал</string>
+    <string name="dynamic_isf_adjust_sensitivity_summary">Если включено - ДинDynISF использует отношение TDD24ч/TDD7д в качестве коэффициента чувствительности и соответствующим образом корректирует базал. Также, как это обычно делает Автосенс.</string>
 </resources>
