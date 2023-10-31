@@ -27,9 +27,6 @@ object ENDefaults {
     const val sensitivity_raises_target = false // raise BG target when autosens detects sensitivity
     const val resistance_lowers_target = false // lower BG target when autosens detects resistance
     const val adv_target_adjustments = false // lower target automatically when BG and eventualBG are high
-    const val exercise_mode = false // when true, > 105 mg/dL high temp target adjusts sensitivityRatio for exercise_mode. This majorly changes the behavior of high temp targets from before. synonym
-    // for high_temptarget_raises_sensitivity
-    const val half_basal_exercise_target = 160 // when temptarget is 160 mg/dL *and* exercise_mode=true, run 50% basal at this level (120 = 75%; 140 = 60%)
 
     // create maxCOB and default it to 120 because that's the most a typical body can absorb over 4 hours.
     // (If someone enters more carbs or stacks more; OpenAPS will just truncate dosing based on 120.
