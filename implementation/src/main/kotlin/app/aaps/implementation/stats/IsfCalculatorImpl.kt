@@ -97,10 +97,12 @@ class IsfCalculatorImpl @Inject constructor(
                             else tddWeightedFromLast8H
 
                         jsLogger.debug("TDD: ${Round.roundTo(tdd, 0.01)}")
-                        jsLogger.debug("tdd1D: ${ if (tdd1D == null) null else Round.roundTo(tdd1D, 0.01)}")
                         jsLogger.debug("tddLast4H: ${Round.roundTo(tddLast4H, 0.01)}")
                         jsLogger.debug("tddLast8to4H: ${Round.roundTo(tddLast8to4H, 0.01)}")
                         jsLogger.debug("tddWeightedFromLast8H: ${Round.roundTo(tddWeightedFromLast8H, 0.01)}")
+                        jsLogger.debug("tddLast24H: ${Round.roundTo(tddLast24H, 0.01)}")
+                        jsLogger.debug("tdd1D: ${ if (tdd1D == null) null else Round.roundTo(tdd1D, 0.01)}")
+                        jsLogger.debug("tdd7D: ${Round.roundTo(tdd7D, 0.01)}")
 
                         val dynISFadjust = SafeParse.stringToDouble(sp.getString(app.aaps.core.utils.R.string.key_dynamic_isf_tdd_adjust, "100")) / 100.0
                         tdd *= dynISFadjust
@@ -111,7 +113,7 @@ class IsfCalculatorImpl @Inject constructor(
                             jsLogger.debug("TDD ISF adjusted by %.2f due to profile", globalScale)
                         }
 
-                        if (ratio == 1.0 && adjustSens) {
+                        if (adjustSens) {
                             ratio = Math.max(Math.min(tddLast24H / tdd7D, autosensMax), autosensMin)
                             sensNormalTarget /= ratio
                             jsLogger.debug("ratio set to %.2f due to TDD sensitivity", ratio)
