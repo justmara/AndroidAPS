@@ -1276,6 +1276,10 @@ class SmsCommunicatorPlugin @Inject constructor(
         return true
     }
 
+    override fun isProfileSwitchReportingEnabled(): Boolean {
+        return sp.getBoolean(R.string.key_smscommunicator_report_profile_change, true)
+    }
+
     private fun generatePassCode(): String {
         if (otp.isEnabled()) {
             // this not realy generate password - rather info to use Authenticator TOTP instead
