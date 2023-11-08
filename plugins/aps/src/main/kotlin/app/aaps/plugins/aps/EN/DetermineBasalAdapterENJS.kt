@@ -10,6 +10,7 @@ import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.stats.IsfCalculator
 import app.aaps.core.interfaces.stats.TddCalculator
+import app.aaps.core.interfaces.stats.TirCalculator
 import app.aaps.core.interfaces.utils.MidnightTime
 import app.aaps.core.interfaces.utils.SafeParse
 import app.aaps.core.main.extensions.convertedToAbsolute
@@ -36,6 +37,7 @@ class DetermineBasalAdapterENJS internal constructor(scriptReader: ScriptReader,
     // @Inject lateinit var dateUtil: DateUtil
     @Inject lateinit var tddCalculator: TddCalculator
     @Inject lateinit var isfCalculator: IsfCalculator
+    @Inject lateinit var tirCalculator: TirCalculator
 
     override val jsFolder = "EN"
     override val useLoopVariants = true
@@ -123,9 +125,10 @@ var getIsfByProfile = function (bg, profile) {
         this.profile.put("autosens_min", SafeParse.stringToDouble(sp.getString(app.aaps.core.utils.R.string.key_openapsama_autosens_min, "0.8")))
         this.profile.put("autosens_max", SafeParse.stringToDouble(sp.getString(app.aaps.core.utils.R.string.key_openapsama_autosens_max, "1.2")))
 //**********************************************************************************************************************************************
-        // patches ==== START
+        // Eating Now
         this.profile.put("EatingNowTimeStart", sp.getInt(R.string.key_eatingnow_timestart, 9))
-        this.profile.put("EatingNowTimeEnd", sp.getInt(R.string.key_eatingnow_timeend, 17))
+        val EatingNowTimeEnd = sp.getInt(R.string.key_eatingnow_timeend, 17)
+        this.profile.put("EatingNowTimeEnd", EatingNowTimeEnd)
         val normalTargetBG = profile.getTargetMgdl()
         this.profile.put("EN_max_iob", sp.getDouble(R.string.key_en_max_iob, 0.0))
         this.profile.put("EN_max_iob_allow_smb", sp.getBoolean(R.string.key_en_max_iob_allow_smb, true))
@@ -133,50 +136,26 @@ var getIsfByProfile = function (bg, profile) {
         this.profile.put("enableGhostCOBAlways", sp.getBoolean(R.string.key_use_ghostcob_always, false))
         val minCOB = sp.getInt(R.string.key_mincob, 0)
         this.profile.put("minCOB", minCOB)
-
-
         this.profile.put("allowENWovernight", sp.getBoolean(R.string.key_use_enw_overnight, false))
-        //this.profile.put("COBWindow", sp.getInt(R.string.key_eatingnow_cobboostminutes, 0))
-
-        // Within the EN Window ********************************************************************************
-        this.profile.put("ENWindow", sp.getInt(R.string.key_eatingnow_enwindowminutes, 0))
-        this.profile.put("ENWPct", sp.getInt(R.string.key_eatingnow_pct, 100))
         this.profile.put("ENWIOBTrigger", sp.getDouble(R.string.key_enwindowiob, 0.0))
         val enwMinBolus = sp.getDouble(R.string.key_enwminbolus, 0.0)
         this.profile.put("ENWMinBolus", enwMinBolus)
         this.profile.put("ENautostart", sp.getBoolean(R.string.key_enautostart, false))
-
-        // Breakfast / first meal
-        this.profile.put("ENBkfstWindow", sp.getInt(R.string.key_enbkfstwindowminutes, 0))
-        this.profile.put("BreakfastPct", sp.getInt(R.string.key_eatingnow_breakfastpct, 100))
-        this.profile.put("EN_COB_maxBolus_breakfast", sp.getDouble(R.string.key_eatingnow_cobboost_maxbolus_breakfast, 0.0))
-        this.profile.put("EN_UAM_maxBolus_breakfast", sp.getDouble(R.string.key_eatingnow_uam_maxbolus_breakfast, 0.0))
-        // other meals
-        this.profile.put("EN_COB_maxBolus", sp.getDouble(R.string.key_eatingnow_cobboost_maxbolus, 0.0))
-        this.profile.put("EN_UAM_maxBolus", sp.getDouble(R.string.key_eatingnow_uamboost_maxbolus, 0.0))
-        // this.profile.put("UAMbgBoost_bkfast", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_uambgboost_bkfast, 0.0),profileFunction.getUnits()))
-        this.profile.put("EN_UAMPlus_PreBolus_bkfast", sp.getDouble(R.string.key_eatingnow_uambgboost_maxbolus_bkfast, 0.0))
-        // this.profile.put("UAMbgBoost", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_uambgboost, 0.0),profileFunction.getUnits()))
-        this.profile.put("EN_UAMPlus_PreBolus", sp.getDouble(R.string.key_eatingnow_uambgboost_maxbolus, 0.0))
-        this.profile.put("EN_UAMPlusSMB_NoENW", sp.getBoolean(R.string.key_use_uamplus_noenw, false))
-        this.profile.put("EN_UAMPlusTBR_NoENW", sp.getBoolean(R.string.key_use_uamplustbr_noenw, false))
-
-        this.profile.put("EN_UAMPlus_maxBolus_bkfst", sp.getDouble(R.string.key_eatingnow_uamplus_maxbolus_bkfast, 0.0))
-        this.profile.put("EN_UAMPlus_maxBolus", sp.getDouble(R.string.key_eatingnow_uamplus_maxbolus, 0.0))
-        this.profile.put("EN_NoENW_maxBolus", sp.getDouble(R.string.key_eatingnow_noenw_maxbolus, 0.0))
-        this.profile.put("EN_BGPlus_maxBolus", sp.getDouble(R.string.key_eatingnow_bgplus_maxbolus, 0.0))
-
-        // this.profile.put("SMBbgOffset", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_smbbgoffset, 0.0),profileFunction.getUnits()))
         this.profile.put("SMBbgOffset",profileUtil.convertToMgdl(sp.getDouble(R.string.key_eatingnow_smbbgoffset, 0.0), profileFunction.getUnits()))
-        // this.profile.put("SMBbgOffset_day", Profile.toMgdl(sp.getDouble(R.string.key_eatingnow_smbbgoffset_day, 0.0),profileFunction.getUnits()))
         this.profile.put("SMBbgOffset_day",profileUtil.convertToMgdl(sp.getDouble(R.string.key_eatingnow_smbbgoffset_day, 0.0), profileFunction.getUnits()))
         this.profile.put("ISFbgscaler", sp.getDouble(R.string.key_eatingnow_isfbgscaler, 0.0))
         this.profile.put("MaxISFpct", sp.getInt(R.string.key_eatingnow_maxisfpct, 0))
         this.profile.put("useDynISF", sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, true))
 
         this.profile.put("percent", if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100)
-        // patches ==== END
+
+        this.profile.put("EN_UAMPlusSMB_NoENW", sp.getBoolean(R.string.key_use_uamplus_noenw, false))
+        this.profile.put("EN_UAMPlusTBR_NoENW", sp.getBoolean(R.string.key_use_uamplustbr_noenw, false))
+
+        this.profile.put("EN_NoENW_maxBolus", sp.getDouble(R.string.key_eatingnow_noenw_maxbolus, 0.0))
+        this.profile.put("EN_BGPlus_maxBolus", sp.getDouble(R.string.key_eatingnow_bgplus_maxbolus, 0.0))
 //**********************************************************************************************************************************************
+
         if (profileFunction.getUnits() == GlucoseUnit.MMOL) {
             this.profile.put("out_units", "mmol/L")
         }
@@ -196,7 +175,6 @@ var getIsfByProfile = function (bg, profile) {
         } else {
             mGlucoseStatus.put("delta", glucoseStatus.delta)
         }
-
         mGlucoseStatus.put("short_avgdelta", glucoseStatus.shortAvgDelta)
         mGlucoseStatus.put("long_avgdelta", glucoseStatus.longAvgDelta)
         mGlucoseStatus.put("date", glucoseStatus.date)
@@ -272,13 +250,41 @@ var getIsfByProfile = function (bg, profile) {
 
         // get the TDD since ENW Start
         this.mealData.put("ENWStartTime", ENWStartTime)
-        // this.mealData.put("ENWBolusIOB", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculateDaily(ENWStartTime, now)?.bolusAmount else 0)
-
         var ENWBolusIOB = if (now < ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now, allowMissingData = true)?.totalAmount else 0
         if (ENWBolusIOB == null) ENWBolusIOB = 0
         this.mealData.put("ENWBolusIOB", ENWBolusIOB)
-        this.profile.put("ENW_breakfast_max_tdd", sp.getDouble(R.string.key_enw_breakfast_max_tdd, 0.0))
-        this.profile.put("ENW_max_tdd", sp.getDouble(R.string.key_enw_max_tdd, 0.0))
+
+        // calculate the time that breakfast should be finished or ignored
+        var EN_BkfstCutOffhr = sp.getInt(R.string.key_eatingnow_bkfstcutoff, 0) // cutoff pref
+        if (EN_BkfstCutOffhr == 0) EN_BkfstCutOffhr = EatingNowTimeEnd
+        val EN_BkfstCutOffTime = 3600000 * EN_BkfstCutOffhr + MidnightTime.calc(now)
+
+
+        // determine if the current ENW is the first meal of the day
+        val firstMealWindow = (ENStartedTime == ENWStartTime && now < EN_BkfstCutOffTime)
+        this.mealData.put("firstMealWindow", firstMealWindow)
+        sp.putBoolean("ENdb_firstMealWindow", ENWStartTime == 0L && now < EN_BkfstCutOffTime) // has EN started? used for TT dialog only
+
+        // use the settings based on the first meal validation
+        if (firstMealWindow) {
+            // Breakfast profile
+            this.profile.put("ENWDuration", sp.getInt(R.string.key_enbkfstwindowminutes, 0)) // ENBkfstWindow
+            this.profile.put("MealPct", sp.getInt(R.string.key_eatingnow_breakfastpct, 100)) // meal scaling - BreakfastPct
+            this.profile.put("ENW_maxBolus_COB", sp.getDouble(R.string.key_eatingnow_cobboost_maxbolus_breakfast, 0.0)) // EN_COB_maxBolus_breakfast
+            this.profile.put("ENW_maxBolus_UAM", sp.getDouble(R.string.key_eatingnow_uam_maxbolus_breakfast, 0.0)) // EN_UAM_maxBolus_breakfast
+            this.profile.put("ENW_maxPreBolus", sp.getDouble(R.string.key_eatingnow_uambgboost_maxbolus_bkfast, 0.0)) // EN_UAMPlus_PreBolus_bkfast
+            this.profile.put("ENW_maxBolus_UAM_plus", sp.getDouble(R.string.key_eatingnow_uamplus_maxbolus_bkfast, 0.0)) //EN_UAMPlus_maxBolus_bkfst
+            this.profile.put("ENW_maxIOB", sp.getDouble(R.string.key_enw_breakfast_max_tdd, 0.0)) // ENW_breakfast_max_tdd
+        } else {
+            // Subsequent meals profile
+            this.profile.put("ENWDuration", sp.getInt(R.string.key_eatingnow_enwindowminutes, 0)) // ENWindow
+            this.profile.put("MealPct", sp.getInt(R.string.key_eatingnow_pct, 100)) // meal scaling - ENWPct
+            this.profile.put("ENW_maxBolus_COB", sp.getDouble(R.string.key_eatingnow_cobboost_maxbolus, 0.0)) //EN_COB_maxBolus
+            this.profile.put("ENW_maxBolus_UAM", sp.getDouble(R.string.key_eatingnow_uamboost_maxbolus, 0.0)) //EN_UAM_maxBolus
+            this.profile.put("ENW_maxPreBolus", sp.getDouble(R.string.key_eatingnow_uambgboost_maxbolus, 0.0)) //EN_UAMPlus_PreBolus
+            this.profile.put("ENW_maxBolus_UAM_plus", sp.getDouble(R.string.key_eatingnow_uamplus_maxbolus, 0.0)) //EN_UAMPlus_maxBolus
+            this.profile.put("ENW_maxIOB", sp.getDouble(R.string.key_enw_max_tdd, 0.0)) //ENW_max_tdd
+        }
 
         // 3PM is used as a low basal point at which the rest of the day leverages for ISF variance when using one ISF in the profile
         this.profile.put("enableBasalAt3PM", sp.getBoolean(R.string.key_use_3pm_basal, false))
@@ -366,7 +372,46 @@ var getIsfByProfile = function (bg, profile) {
         this.profile.put("insulinType", insulin.friendlyName)
         this.profile.put("insulinPeak", insulinPeak)
 
-        val isf = isfCalculator.calculateAndSetToProfile(profile, insulinDivisor, glucoseStatus, tempTargetSet, this.profile)
+        val isf = isfCalculator.calculateAndSetToProfile(
+            profile.getIsfMgdl(),
+            if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100,
+            targetBg,
+            insulinDivisor, glucoseStatus, tempTargetSet, this.profile)
+
+        val resistancePerHr = sp.getDouble(R.string.en_resistance_per_hour, 0.0)
+        this.profile.put("resistancePerHr", sp.getDouble(R.string.en_resistance_per_hour, 0.0))
+        if (resistancePerHr > 0) {
+            var TIRTarget = normalTargetBG + 20.0 // TIRB1 - lower band
+            // TIR 4h ago
+            tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(4, 3, normalTargetBG-9.0, TIRTarget)).let { tir ->
+                this.mealData.put("TIRTW4H",tir.abovePct())
+                this.mealData.put("TIRTW4L",tir.belowPct())
+            }
+
+            // TIR 3h ago
+            tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3, 2, normalTargetBG-9.0, TIRTarget)).let { tir ->
+                this.mealData.put("TIRTW3H",tir.abovePct())
+                this.mealData.put("TIRTW3L",tir.belowPct())
+            }
+
+            // TIR 2h ago
+            tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2, 1, normalTargetBG-9.0, TIRTarget)).let { tir ->
+                this.mealData.put("TIRTW2H",tir.abovePct())
+                this.mealData.put("TIRTW2L",tir.belowPct())
+            }
+
+            // TIR 1h ago
+            tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1, 0, normalTargetBG-9.0, TIRTarget)).let { tir ->
+                this.mealData.put("TIRTW1H",tir.abovePct())
+                this.mealData.put("TIRTW1L",tir.belowPct())
+            }
+
+            TIRTarget = normalTargetBG + 50.0 // TIRB2 - higher band
+            this.mealData.put("TIRW4H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(4, 3, 72.0, TIRTarget)).abovePct())
+            this.mealData.put("TIRW3H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3, 2, 72.0, TIRTarget)).abovePct())
+            this.mealData.put("TIRW2H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2, 1, 72.0, TIRTarget)).abovePct())
+            this.mealData.put("TIRW1H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1, 0, 72.0, TIRTarget)).abovePct())
+            }
 
         this.profile.put("SR_TDD", TDDLastCannula / TDDAvg7d)
         this.profile.put("sens_LCTDD", isf.isf * TDD / TDDLastCannula)
