@@ -302,6 +302,7 @@ var getIsfByProfile = function (bg, profile) {
 
         // storing TDD values in prefs, terrible but hopefully effective
         // check when TDD last updated
+        this.mealData.put("ENWTDD", if (now <= ENWStartTime+(4*3600000)) tddCalculator.calculate(ENWStartTime, now, false)?.bolusAmount ?: 0 else 0)
         val TDDLastUpdate =  sp.getLong("TDDLastUpdate",0)
         val TDDHrSinceUpdate = (now - TDDLastUpdate) / 3600000
 
