@@ -8,6 +8,7 @@
     <string name="key_smscommunicator_allowednumbers" translatable="false">smscommunicator_allowednumbers</string>
     <string name="key_smscommunicator_remote_commands_allowed" translatable="false">smscommunicator_remotecommandsallowed</string>
     <string name="key_smscommunicator_addpumpstatus" translatable="false">smscommunicator_addpumpstatus</string>
+    <string name="key_smscommunicator_report_profile_change" translatable="false">smscommunicator_report_profile_change</string>
     <string name="key_smscommunicator_reporttoall" translatable="false">smscommunicator_reporttoall</string>
     <string name="key_smscommunicator_otp_enabled" translatable="false">smscommunicator_otp_enabled</string>
 
@@ -63,6 +64,7 @@
     <string name="smscommunicator_tt_canceled">Temp Target canceled successfully</string>
     <string name="smscommunicator_remote_commands_allowed">Allow remote commands via SMS</string>
     <string name="smscommunicator_addpumpstatus">Add short pump status to result message</string>
+    <string name="smscommunicator_report_profile_change">Send report for profile changes</string>
     <string name="smscommunicator_reporttoall">Send report to all</string>
     <string name="smscommunicator_reporttoall_summary">Disabling this option will send successful command report to command sender only</string>
     <string name="smscommunicator_loop_has_been_disabled">Loop has been disabled</string>

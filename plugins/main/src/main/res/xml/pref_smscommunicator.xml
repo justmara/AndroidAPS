@@ -26,6 +26,11 @@
 
         <SwitchPreference
             android:defaultValue="true"
+            android:key="@string/key_smscommunicator_report_profile_change"
+            android:title="@string/smscommunicator_report_profile_change" />
+
+        <SwitchPreference
+            android:defaultValue="true"
             android:key="@string/key_smscommunicator_reporttoall"
             android:title="@string/smscommunicator_reporttoall"
             android:summary="@string/smscommunicator_reporttoall_summary"/>
