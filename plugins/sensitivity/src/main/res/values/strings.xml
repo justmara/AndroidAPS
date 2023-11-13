@@ -42,6 +42,6 @@
     <string name="dynamic_isf_bg_cap_dialogMessage" formatted="false">This controls the BG level, after that the Dynamic ISF scaling starts to suffer from diminishing returns. Every BG point over this value will count as ⅓ in Dynamic ISF scaling formulae. Must help preventing overreacting on highs.</string>
     <string name="dynamic_isf_obey_profile_title" formatted="false">Obey profile</string>
     <string name="dynamic_isf_obey_profile_summary" formatted="false">Apply profile % changes to TDD-based Dynamic ISF</string>
-    <string name="dynamic_isf_adjust_sensitivity">Adjust sensitivity and basal</string>
-    <string name="dynamic_isf_adjust_sensitivity_summary">If activated DynISF uses the last 24h TDD/7D TDD as the basis for adjusting calculated ISF and also for increasing and decreasing basal rate, in the same way that standard Autosens does</string>
+    <string name="dynamic_isf_adjust_sensitivity">Enable TDD based sensitivity ratio for basal and glucose target modification</string>
+    <string name="dynamic_isf_adjust_sensitivity_summary">Uses the last 24h TDD/7D TDD to calculate sensitivity ratio used for increasing or decreasing basal rate, and also adjust glucose target if these options are enabled, in the same way Autosens does. It is recommended to start with this option turned off</string>
 </resources>
