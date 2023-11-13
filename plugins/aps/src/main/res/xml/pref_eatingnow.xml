@@ -531,15 +531,15 @@
 
             <Preference android:summary="UAM+ is similar to the Boost plugin. UAM+ PreBolus can boost the BG to trigger an initial bolus for UAM. UAM+ can also be used outside the ENW to provide larger UAM boluses."></Preference>
 
-            <app.aaps.core.validators.ValidatingEditTextPreference
-                android:defaultValue="0"
-                android:inputType="numberDecimal"
-                android:title="UAM+ Breakfast PreBolus Boost"
-                android:key="@string/key_eatingnow_uambgboost_bkfast"
-                android:dialogMessage="Initial UAM Breakfast PreBolus Boost for start of EN-TT.\neventualBG will be increased from current BG or eventualBG using this amount.\n0 will leave this option disabled."
-                validate:floatmaxNumber="200"
-                validate:floatminNumber="0"
-                validate:testType="floatNumericRange" />
+<!--            <app.aaps.core.validators.ValidatingEditTextPreference-->
+<!--                android:defaultValue="0"-->
+<!--                android:inputType="numberDecimal"-->
+<!--                android:title="UAM+ Breakfast PreBolus Boost"-->
+<!--                android:key="@string/key_eatingnow_uambgboost_bkfast"-->
+<!--                android:dialogMessage="Initial UAM Breakfast PreBolus Boost for start of EN-TT.\neventualBG will be increased from current BG or eventualBG using this amount.\n0 will leave this option disabled."-->
+<!--                validate:floatmaxNumber="200"-->
+<!--                validate:floatminNumber="0"-->
+<!--                validate:testType="floatNumericRange" />-->
 
             <app.aaps.core.validators.ValidatingEditTextPreference
                 android:defaultValue="0"

@@ -232,8 +232,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
     if (now >= ENStartTime && now < ENEndTime && (meal_data.ENStartedTime >= ENStartTime)) ENtimeOK = true;
     if (now >= ENStartTime && now < ENEndTime && profile.ENautostart) ENtimeOK = true;
     var lastNormalCarbAge = round((new Date(systemTime).getTime() - meal_data.lastENCarbTime) / 60000);
-    // minutes since last bolus
-//    var lastBolusAge = (new Date(systemTime).getTime() - meal_data.lastBolusTime) / 60000;
+    var lastBolusAge = (new Date(systemTime).getTime() - meal_data.lastBolusTime) / 60000; // minutes since last bolus for BG+
 
 
     enlog += "nowhrs: " + nowhrs + ", now: " + now + "\n";
@@ -1157,15 +1156,15 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             //if (ENWindowOK) {
                 // for lower eventualBg predictions increase eventualBG with UAMDeltaX using current bg as the basis when early on in ENW or less than 80 of ENWBolusIOBMax has been given
             //if (ENWindowOK && ENWStartedAgo < 30 || (ENWBolusIOBMax > 0 && (meal_data.ENWBolusIOB / ENWBolusIOBMax) < 0.80) && eventualBG < 270) {
-            if (ENWindowOK && ENWStartedAgo < 90) {
+            if (ENWindowOK && ENWStartedAgo < ENWindowDuration) {
                 // Define the range for UAMDeltaX
                 var UAMDeltaXforecast = Math.min(ENWindowDuration,120);
                 var UAMDeltaXboost = (ENPBActive ? 1 : 1.5);
                 var UAMDeltaXmax = (ENPBActive ? 90 : 90); // max increase of 5mmol or 7.5mmol
                 // Calculate the scaled UAMDeltaX based on the ENW
                 UAMDeltaX = (1-(ENWStartedAgo/ENWindowDuration)) * UAMDeltaXforecast / 5 * UAMDeltaXboost;
-                //eventualBG = Math.max(eventualBG, bg + Math.min(UAMDeltaX * delta,50)); //eBG max increase ~3mmol
                 eventualBG = Math.max(eventualBG, bg + Math.min(UAMDeltaX * delta,UAMDeltaXmax)); //eBG max increase ~5mmol
+                UAMDeltaX = (eventualBG > eventualBG_orig ? UAMDeltaX : 0); // when UAMDeltaX provides no increase reset for reason later
                     eventualBG = Math.min(eventualBG, 270); // safety max of 15mmol
                 //AllowZT = (ENWStartedAgo < 45 ? false : true); // allow ZT
                 minPredBG = Math.max(minPredBG,threshold); // bypass LGS for ENW
@@ -1176,22 +1175,21 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
                 minPredBG = Math.max(minPredBG,threshold); // bypass LGS for ENW
                 minGuardBG = Math.max(minGuardBG,threshold); // bypass LGS for ENW
                 minBG = Math.max(minPredBG,minGuardBG); // go with the largest value for UAM+
+                eventualBG = Math.min(eventualBG, 270); // safety max of 15mmol
                 // when favouring minPredBG allow more of eventualBG
                 eBGweight = (eBGweight == 0 ? 0.5 : eBGweight);
-            } else {
-                sens_predType = "UAM"; // pass onto UAM block
+            } else { // low delta but accelerating no LGS bypass
+                // when favouring minPredBG allow more of eventualBG
+                eBGweight = (eBGweight == 0 ? 0.5 : eBGweight);
+                // sens_predType = "UAM"; // pass onto UAM block
                 // Check for BG+ condition
-                //if (profile.EN_BGPlus_maxBolus != 0 && TIR_sens_limited > 1 && eventualBG < bg) sens_predType = "BG+";
-                if (profile.EN_BGPlus_maxBolus != 0 && TIR_sens_limited > 1 && eventualBG < bg && ENWEndedAgo > 60 ) sens_predType = "BG+";
+                if (profile.EN_BGPlus_maxBolus != 0 && TIR_sens_limited > 1 && eventualBG < bg && ENWEndedAgo > 60 && lastBolusAge >= 15) sens_predType = "BG+";
             }
-//            var endebug = "UAMDeltaX:" + round(UAMDeltaX,2)+"="+convert_bg(Math.min(UAMDeltaX * delta,UAMDeltaXmax),profile);
         }
 
         // UAM predictions, no COB or GhostCOB
         if (sens_predType == "UAM" && (!COB || ignoreCOB)) {
-            // positive or negative delta with acceleration and default
-            //eBGweight = (DeltaPctS > 1.0 || eventualBG > bg ? 0.50 : eBGweight);
-            eBGweight = (ENWindowOK ? 0.50 : eBGweight);
+           eBGweight = (ENWindowOK ? 0.50 : eBGweight); // allow more eBG within ENW or UAM+ inherited eBGw
 
             // SAFETY: UAM fast delta with higher bg lowers eBGw
             eBGweight = (bg > ISFbgMax && delta >= 15 && ENWBolusIOBMax == 0 ? 0.30 : eBGweight);
@@ -1224,9 +1222,9 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
 
         // IOB prediction - TESTING when lower than target for some time prevent additional insulin
         if (sens_predType == "IOB") {
-            // When sensitive and below target with low IOB dont trust IOBpredBG and override eventualBG
+            // When sensitive and below target with low IOB dont trust predictions and override eventualBG
             eventualBG = Math.min(eventualBG,bg);
-            eBGweight = 1; // trust the new eventualBG
+            eBGweight = 0.5; // use eBG between bg and minPredBG
         }
 
         // calculate the prediction bg based on the weightings for minPredBG and eventualBG, if boosting use eventualBG
@@ -1254,7 +1252,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
     rT.COB = meal_data.mealCOB;
     rT.IOB = iob_data.iob;
     rT.reason = "COB: " + round(meal_data.mealCOB, 1) + (meal_data.carbs ? " " + round(fractionCOBAbsorbed * 100) + "%" : "") +  ", Dev: " + convert_bg(deviation, profile) + ", BGI: " + convert_bg(bgi, profile) + ", Delta: " + convert_bg(glucose_status.delta, profile) + "/" + convert_bg(glucose_status.short_avgdelta, profile) + "/" + convert_bg(glucose_status.long_avgdelta, profile) + "=" + round(DeltaPctS * 100) + "/" + round(DeltaPctL * 100) + "%";
-    rT.reason += ", ISF: " + convert_bg(sens_normalTarget, profile) + (MaxISF != 1 && sens_normalTarget == MaxISF ? "*" : "") + "/" + convert_bg(sens, profile) + "=" + convert_bg(insulinReq_sens, profile) + ", CR: " + round(carb_ratio, 2) + ", Target: " + convert_bg(target_bg, profile) + (target_bg != normalTarget ? "(" + convert_bg(normalTarget, profile) + ")" : "");
+    rT.reason += ", ISF: " + convert_bg(sens_normalTarget, profile) + (MaxISF > 0 && sens_normalTarget == MaxISF ? "*" : "") + "/" + convert_bg(sens, profile) + "=" + convert_bg(insulinReq_sens, profile) + ", CR: " + round(carb_ratio, 2) + ", Target: " + convert_bg(target_bg, profile) + (target_bg != normalTarget ? "(" + convert_bg(normalTarget, profile) + ")" : "");
     rT.reason += ", minPredBG " + convert_bg(minPredBG_orig, profile) + (minPredBG > minPredBG_orig ? "=" + convert_bg(minPredBG, profile) : "") + ", minGuardBG " + convert_bg(minGuardBG_orig, profile) + (minGuardBG > minGuardBG_orig ? "=" + convert_bg(minGuardBG, profile) : "") + ", IOBpredBG " + convert_bg(lastIOBpredBG, profile);
 
     if (lastCOBpredBG > 0) {
@@ -1281,12 +1279,17 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
 
     // other EN stuff
     rT.reason += ", eBGw: " + sens_predType + " " + convert_bg(insulinReq_bg_orig, profile);
-    rT.reason += (insulinReq_bg != insulinReq_bg_orig ? "=" + convert_bg(insulinReq_bg,profile) : "") + " " + round(eBGweight * 100) + "%";
-    rT.reason += ", TDD:" + round(profile.TDD, 2) + " " + (profile.sens_TDD_scale != 100 ? profile.sens_TDD_scale + "% " : "") + "(" + convert_bg(sens_TDD, profile) + ")";
+    if (insulinReq_bg != insulinReq_bg_orig) {
+        if (UAMDeltaX) rT.reason += "=" + convert_bg(bg,profile) + "+" + convert_bg(insulinReq_bg-bg,profile);
+        rT.reason += "=" + convert_bg(insulinReq_bg,profile);
+    }
+    rT.reason += " " + round(eBGweight * 100) + "%";
+
+    rT.reason += ", TDD:" + round(TDD, 2) + " " + (profile.sens_TDD_scale != 100 ? profile.sens_TDD_scale + "% " : "") + "(" + convert_bg(sens_TDD, profile) + ")";
     if (profile.use_sens_LCTDD) rT.reason += ", LCTDD:" + round(meal_data.TDDLastCannula,2) + " " + (profile.sens_TDD_scale != 100 ? profile.sens_TDD_scale + "% " : "") + "(" + convert_bg(sens_LCTDD, profile) + ")";
     rT.reason += ", TDD7:" + round(meal_data.TDDAvg7d,2);
     if (profile.use_autosens) rT.reason += ", AS: " + round(autosens_data.ratio, 2);
-    if (TIR_sens_limited != 1) rT.reason += ", ISF@" + round(TIRH_percent*100) + "%hr: " + round(TIR_sens*100) + (round(TIR_sens_limited*100) != round(TIR_sens*100) ? "=" + round(TIR_sens_limited*100) : "");
+    if (TIRH_percent > 0) rT.reason += ", ISF@" + round(TIRH_percent*100) + "%hr: " + round(TIR_sens*100) + (round(TIR_sens_limited*100) != round(TIR_sens*100) ? "=" + round(TIR_sens_limited*100) : "");
     if (profile.enableSRTDD) rT.reason += ", Basal%: " + round(SR_TDD*100) + (round(sensitivityRatio*100) != round(SR_TDD*100) ? "=" + round(sensitivityRatio*100) : "");
     rT.reason += ", LGS: " + convert_bg(threshold, profile);
     rT.reason += ", LRT: " + round(60 * minAgo);
@@ -1592,7 +1595,8 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             var ENMaxSMB = maxBolus; // inherit AAPS maxBolus
             var maxBolusOrig = maxBolus;
             var ENinsulinReqPct = 0.75; // EN insulinReqPct is 75%
-            var ENWinsulinReqPct = (ENWStartedAgo <= ENWindowDuration / 3 ? 1 : 0.85); // ENW insulinReqPct is 100% for the first 30 mins then 85%
+//            var ENWinsulinReqPct = (ENWStartedAgo <= ENWindowDuration / 3 ? 1 : 0.85); // ENW insulinReqPct is 100% for the first 30 mins then 85%
+            var ENWinsulinReqPct = (ENWStartedAgo <= ENWindowDuration ? 1 : ENinsulinReqPct); // ENW insulinReqPct is 100% for the first 30 mins then 85%
 
 
             // ============== INSULINREQPCT CHANGES ==============
@@ -1653,10 +1657,6 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             if (ENMaxSMB > max_iob) ENMaxSMB = profile.current_basal * ENMaxSMB / 60;
             var roundSMBTo = 1 / profile.bolus_increment;
 
-            // when insulinReq is greater than 3 x maxBolus or PB dont allow ZT, unless BG+
-            AllowZT = (ENactive && insulinReq < ENMaxSMB *3 && sens_predType != "BG+" || UAMBGPreBolusUnitsLeft > 0);
-
-
             // ============== TIME BASED RESTRICTIONS ==============
             if (ENtimeOK) {
                 // increase maxbolus if we are within the hours specified
@@ -1693,6 +1693,9 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             worstCaseInsulinReq = (smbTarget - (naive_eventualBG + minIOBPredBG) / 2) / sens;
             durationReq = round(60 * worstCaseInsulinReq / profile.current_basal);
 
+
+            // when insulinReq is greater than 3 x maxBolus or PB dont allow ZT, unless BG+
+            AllowZT = (ENactive && insulinReq < microBolus *3 && sens_predType != "BG+" || UAMBGPreBolusUnitsLeft > 0);
             // No ZT allowed by EN
             if (!AllowZT) durationReq = 0;
 
@@ -1781,6 +1784,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
             //rT.reason += "** DEBUG: " + "rate:" + round_basal(rate, profile);
             rate = Math.max(basal + (insulinReq * 2 - microBolus), 0); //remaining insulinReq over 60 minutes * 2 = 30 minutes
             rate = round_basal(rate, profile);
+            //rT.reason += "=" + round_basal(rate, profile) + "** ";
         }
 
         if (rate > maxSafeBasal) {
