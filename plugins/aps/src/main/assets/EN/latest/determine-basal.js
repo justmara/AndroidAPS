@@ -1284,10 +1284,11 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
         rT.reason += "=" + convert_bg(insulinReq_bg,profile);
     }
     rT.reason += " " + round(eBGweight * 100) + "%";
-
-    rT.reason += ", TDD:" + round(TDD, 2) + " " + (profile.dynISFadjust != 100 ? profile.dynISFadjust + "% " : "") + "(" + convert_bg(sens_TDD, profile) + ")";
-    if (profile.use_sens_LCTDD) rT.reason += ", LCTDD:" + round(meal_data.TDDLastCannula,2) + " " + (profile.dynISFadjust != 100 ? profile.dynISFadjust + "% " : "") + "(" + convert_bg(sens_LCTDD, profile) + ")";
-    rT.reason += ", TDD7:" + round(meal_data.TDDAvg7d,2);
+    if  (profile.TDD) {
+        rT.reason += ", TDD:" + round(TDD, 2) + " " + (profile.dynISFadjust != 100 ? profile.dynISFadjust + "% " : "") + "(" + convert_bg(sens_TDD, profile) + ")";
+        if (profile.use_sens_LCTDD) rT.reason += ", LCTDD:" + round(meal_data.TDDLastCannula,2) + " " + (profile.dynISFadjust != 100 ? profile.dynISFadjust + "% " : "") + "(" + convert_bg(sens_LCTDD, profile) + ")";
+        rT.reason += ", TDD7:" + round(meal_data.TDDAvg7d,2);
+    }
     if (profile.use_autosens) rT.reason += ", AS: " + round(autosens_data.ratio, 2);
     if (TIRH_percent > 0) rT.reason += ", ISF@" + round(TIRH_percent*100) + "%hr: " + round(TIR_sens*100) + (round(TIR_sens_limited*100) != round(TIR_sens*100) ? "=" + round(TIR_sens_limited*100) : "");
     if (profile.enableSRTDD) rT.reason += ", Basal%: " + round(SR_TDD*100) + (round(sensitivityRatio*100) != round(SR_TDD*100) ? "=" + round(sensitivityRatio*100) : "");
