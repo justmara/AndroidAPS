@@ -175,8 +175,8 @@
             android:defaultValue="false"
             android:dependency="@string/key_use_smb"
             android:key="@string/key_enableSMB_with_temptarget"
-            android:summary="@string/enable_smb_with_high_temp_target_summary"
-            android:title="@string/enable_smb_with_high_temp_target" />
+            android:summary="@string/enable_smb_with_temp_target_summary"
+            android:title="@string/enable_smb_with_temp_target" />
 
         <SwitchPreference
             android:defaultValue="false"
