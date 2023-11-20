@@ -57,7 +57,7 @@ function enable_smb(
     if (! microBolusAllowed) {
         console.error("SMB disabled (!microBolusAllowed)");
         return false;
-    } else if (! profile.allowSMB_with_high_temptarget && profile.temptargetSet && target_bg > 100) {
+    } else if (! profile.allowSMB_with_high_temptarget && profile.temptargetSet && target_bg > profile.normalTarget) {
         console.error("SMB disabled due to high temptarget of",target_bg);
         return false;
     } else if (meal_data.bwFound === true && profile.A52_risk_enable === false) {
@@ -97,7 +97,7 @@ function enable_smb(
     }
 
     // enable SMB/UAM (if enabled in preferences) if a low temptarget is set
-    if (profile.enableSMB_with_temptarget === true && (profile.temptargetSet && target_bg < 100)) {
+    if (profile.enableSMB_with_temptarget === true && (profile.temptargetSet && target_bg < profile.normalTarget)) {
         if (meal_data.bwFound) {
             console.error("Warning: SMB enabled within 6h of using Bolus Wizard: be sure to easy bolus 30s before using Bolus Wizard");
         } else {
@@ -215,7 +215,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
     }
 
     var sensitivityRatio;
-    var normalTarget = 100; // evaluate high/low temptarget against 100, not scheduled target (which might change)
+    var normalTarget = profile.normalTarget; // evaluate high/low temptarget against 100, not scheduled target (which might change)
     //*********************************************************************************
     //**                   Start of Dynamic ISF code for predictions                 **
     //*********************************************************************************
@@ -294,6 +294,7 @@ var determine_basal = function determine_basal(glucose_status, currenttemp, iob_
 
     var sens = variable_sens
 
+        // compare currenttemp to iob_data.lastTemp and cancel temp if they don't match
     // compare currenttemp to iob_data.lastTemp and cancel temp if they don't match
     var lastTempAge;
     if (typeof iob_data.lastTemp !== 'undefined' ) {

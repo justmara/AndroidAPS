@@ -3,7 +3,6 @@ package app.aaps.implementation.stats
 import app.aaps.core.interfaces.aps.SMBDefaults
 import app.aaps.core.interfaces.iob.GlucoseStatus
 import app.aaps.core.interfaces.logging.ScriptLogger
-import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.stats.IsfCalculation
@@ -11,7 +10,6 @@ import app.aaps.core.interfaces.stats.IsfCalculator
 import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.utils.Round
 import app.aaps.core.interfaces.utils.SafeParse
-import app.aaps.core.main.profile.ProfileSealed
 import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton

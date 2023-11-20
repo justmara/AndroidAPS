@@ -275,6 +275,7 @@ open class DetermineBasalAdapterSMBJS internal constructor(private val scriptRea
         } else {
             autosensData.put("ratio", 1.0)
         }
+        this.profile.put("normalTarget", 99)
         this.microBolusAllowed = microBolusAllowed
         smbAlwaysAllowed = advancedFiltering
         currentTime = now

@@ -35,14 +35,7 @@
     <string name="key_openapsama_smb_max_range_extension" translatable="false">openapsama_smb_max_range_extension</string>
     <string name="key_a52_risk_enable" translatable="false">a52_risk_enable</string>
 
-    <string name="dynisf_adjust_sensitivity">Adjust sensitivity and BG</string>
     <string name="DynISF_variant" formatted="false">Variant</string>]
-    <string name="DynISFUseTDD" translatable="false">Use TDD-based ISF</string>
-    <string name="DynISFAdjust_title" formatted="false">DynamicISF Adjustment Factor %</string>
-    <string name="DynISFAdjust_summary" formatted="false">Adjustment factor for DynamicISF. Set more than 100% for more aggressive correction doses, and less than 100% for less aggressive corrections.</string>
-    <string name="DynISFVelocity_title" formatted="false">ISF BG Scaling velocity %</string>
-    <string name="DynISFVelocity_summary" formatted="false">This controls how hard ISF will be changed with BG level change</string>
-    <string name="DynISFVelocity_dialogMessage" formatted="false">This controls how hard ISF will be changed with BG level change: 0% means no scaling at all, constant ISF value for every BG level; 100% - regular DynamicISF scaling</string>
     <string name="key_high_temptarget_raises_sensitivity" translatable="false">high_temptarget_raises_sensitivity</string>
     <string name="high_temptarget_raises_sensitivity_title">High temptarget raises sensitivity</string>
     <string name="high_temptarget_raises_sensitivity_summary"><![CDATA[Raise sensitivity for temptargets >= 100]]></string>

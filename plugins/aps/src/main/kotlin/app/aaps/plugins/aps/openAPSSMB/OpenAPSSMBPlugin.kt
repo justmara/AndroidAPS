@@ -119,12 +119,12 @@ open class OpenAPSSMBPlugin @Inject constructor(
     }
 
     private fun verifyProfileLoaded(allowCurrent : Boolean = false) : Profile? {
-        if (profileShared == null || !allowCurrent) profileFunction.getProfile().also { profileShared = it }
+        if (profileShared == null || !allowCurrent) profileShared = profileFunction.getProfile()
         return profileShared
     }
 
     private fun verifyGlucoseStatusLoaded(allowCurrent : Boolean = false) : GlucoseStatus? {
-        if (glucoseStatusShared == null || !allowCurrent) glucoseStatusProvider.glucoseStatusData.also { glucoseStatusShared = it }
+        if (glucoseStatusShared == null || !allowCurrent) glucoseStatusShared = glucoseStatusProvider.glucoseStatusData
         return glucoseStatusShared
     }
 
