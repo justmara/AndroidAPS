@@ -104,6 +104,7 @@ class IsfCalculatorImpl @Inject constructor(
 
                         tdd *= dynISFadjust / 100.0
                         profileJson?.put("TDD", tdd)
+                        profileJson?.put("dynISFadjust", dynISFadjust)
 
                         sensNormalTarget = 1800 / (tdd * (ln((bgNormalTarget / insulinDivisor) + 1)))
                         if (obeyProfile) {

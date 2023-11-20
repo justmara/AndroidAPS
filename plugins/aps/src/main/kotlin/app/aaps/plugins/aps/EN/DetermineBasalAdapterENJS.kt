@@ -412,7 +412,7 @@ var getIsfByProfile = function (bg, profile) {
             this.mealData.put("TIRW3H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(3, 2, 72.0, TIRTarget)).abovePct())
             this.mealData.put("TIRW2H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(2, 1, 72.0, TIRTarget)).abovePct())
             this.mealData.put("TIRW1H", tirCalculator.averageTIR(tirCalculator.calculateHoursPrior(1, 0, 72.0, TIRTarget)).abovePct())
-            }
+        }
 
         this.profile.put("SR_TDD", TDDLastCannula / TDDAvg7d)
         this.profile.put("sens_LCTDD", isf.isf * TDD / TDDLastCannula)
