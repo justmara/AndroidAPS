@@ -237,6 +237,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
             lastAutosensResult = autosensData.autosensResult
         }
         else {
+            lastAutosensResult = AutosensResult()
             lastAutosensResult.sensResult = "autosens disabled"
         }
         val iobArray = iobCobCalculator.calculateIobArrayForSMB(lastAutosensResult, SMBDefaults.exercise_mode, SMBDefaults.half_basal_exercise_target, isTempTarget)
@@ -414,8 +415,9 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
     override fun isAutosensModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
         val enabled = sp.getBoolean(app.aaps.core.utils.R.string.key_use_autosens, false)
+        val tddIsfEnabled = sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_enable, false) && sp.getBoolean(app.aaps.core.utils.R.string.key_dynamic_isf_use_tdd, false)
         if (!enabled) value.set(false, rh.gs(R.string.autosens_disabled_in_preferences), this)
-        else if (this is DynamicISFPlugin) value.set(false, rh.gs(R.string.autosens_disabled_in_dyn_isf), this)
+        else if (this is DynamicISFPlugin && tddIsfEnabled) value.set(false, rh.gs(R.string.autosens_disabled_in_dyn_isf), this)
         return value
     }
 

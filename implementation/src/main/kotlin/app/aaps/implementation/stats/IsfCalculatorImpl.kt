@@ -136,17 +136,12 @@ class IsfCalculatorImpl @Inject constructor(
                 val scaler = ln((bgNormalTarget / insulinDivisor) + 1) / sbg
                 variableSensitivity = sensNormalTarget * (1 - (1 - scaler) * dynIsfVelocity)
 
-                if (ratio == 1.0 && adjustSens && !useTDD) {
-                    ratio = sensNormalTarget / variableSensitivity
-                    jsLogger.debug("ratio set to %.2f due to ISF deviation", ratio)
-                }
-
                 IsfCalculation(
                     glucose.glucose,
                     bgCurrent,
                     Round.roundTo(sensNormalTarget, 0.1),
                     Round.roundTo(variableSensitivity, 0.1),
-                    Round.roundTo(ratio, 0.1),
+                    Round.roundTo(ratio, 0.01),
                     insulinDivisor,
                     dynIsfVelocity
                 )
