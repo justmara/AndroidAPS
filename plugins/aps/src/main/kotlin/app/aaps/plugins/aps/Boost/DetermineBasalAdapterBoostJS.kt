@@ -278,7 +278,7 @@ var getIsfByProfile = function (bg, profile, useCap) {
             targetBg,
             insulinDivisor, glucoseStatus, tempTargetSet, this.profile)
 
-        autosensData.put("ratio", isf.ratio)
+        autosensData.put("ratio", autosensDataRatio * isf.ratio)
         this.profile.put("normalTarget", normalTarget)
 
         this.microBolusAllowed = microBolusAllowed

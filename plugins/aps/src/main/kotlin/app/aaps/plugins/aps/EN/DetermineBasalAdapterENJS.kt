@@ -416,7 +416,7 @@ var getIsfByProfile = function (bg, profile) {
 
         this.profile.put("SR_TDD", TDDLastCannula / TDDAvg7d)
         this.profile.put("sens_LCTDD", isf.isf * TDD / TDDLastCannula)
-        autosensData.put("ratio", isf.ratio)
+        autosensData.put("ratio", autosensDataRatio * isf.ratio)
 
         this.profile.put("normalTarget", 99)
         this.microBolusAllowed = microBolusAllowed

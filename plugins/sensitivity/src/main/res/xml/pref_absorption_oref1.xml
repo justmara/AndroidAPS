@@ -81,7 +81,7 @@
 
 
             <SwitchPreference
-                android:dependency="@string/key_dynamic_isf_enable"
+                android:dependency="@string/key_dynamic_isf_use_tdd"
                 android:defaultValue="true"
                 android:key="@string/key_dynamic_isf_tdd_quick"
                 android:title="@string/dynamic_isf_tdd_quick"
@@ -107,7 +107,7 @@
                 android:summary="@string/dynamic_isf_obey_profile_summary" />
 
             <SwitchPreference
-                android:dependency="@string/key_dynamic_isf_enable"
+                android:dependency="@string/key_dynamic_isf_use_tdd"
                 android:defaultValue="false"
                 android:key="@string/key_dynamic_isf_adjust_sensitivity"
                 android:title="@string/dynamic_isf_adjust_sensitivity"
