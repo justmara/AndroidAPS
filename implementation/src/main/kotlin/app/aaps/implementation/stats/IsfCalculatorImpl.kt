@@ -23,8 +23,15 @@ class IsfCalculatorImpl @Inject constructor(
     private val jsLogger: ScriptLogger,
 ) : IsfCalculator {
 
-    override fun calculateAndSetToProfile(profileSens : Double, profilePercent: Int, targetBg : Double, insulinDivisor: Int, glucose: GlucoseStatus, isTempTarget: Boolean, profileJson: JSONObject?) :
-        IsfCalculation {
+    override fun calculateAndSetToProfile(
+        profileSens : Double,
+        profilePercent: Int,
+        targetBg : Double,
+        insulinDivisor: Int,
+        glucose: GlucoseStatus,
+        isTempTarget: Boolean,
+        autosensDataRatio: Double,
+        profileJson: JSONObject?) : IsfCalculation {
 
         val autosensMax = SafeParse.stringToDouble(sp.getString(app.aaps.core.utils.R.string.key_openapsama_autosens_max, "1.2"))
         val autosensMin = SafeParse.stringToDouble(sp.getString(app.aaps.core.utils.R.string.key_openapsama_autosens_min, "0.7"))
@@ -46,13 +53,14 @@ class IsfCalculatorImpl @Inject constructor(
 
         var sensNormalTarget = profileSens
         var variableSensitivity = sensNormalTarget
-        var ratio = 1.0
+        var ratio = autosensDataRatio
         val bgCurrent =
             if (useDynIsf && glucose.glucose > bgCap) bgCap + ((glucose.glucose - bgCap) / 3)
             else glucose.glucose
 
         jsLogger.header("ISF Calculation")
 
+        if (ratio != 1.0) jsLogger.debugUnits("autosensDataRatio: %.2f", autosensDataRatio)
         jsLogger.debugUnits("BG current: %.2f", glucose.glucose)
         jsLogger.debugUnits("BG capped: %.2f", bgCurrent)
         jsLogger.debugUnits("ISF profile: %.2f", profileSens)
@@ -123,11 +131,12 @@ class IsfCalculatorImpl @Inject constructor(
 
                 if (isTempTarget && ((highTemptargetRaisesSensitivity && targetBg > bgNormalTarget) || (lowTemptargetLowersSensitivity && targetBg < bgNormalTarget))) {
                     val c = halfBasalTarget - bgNormalTarget
-                    ratio = c / (c + targetBg - bgNormalTarget)
+                    val correction = c / (c + targetBg - bgNormalTarget)
+                    ratio *= c
                     ratio = Math.max(Math.min(ratio, autosensMax), autosensMin)
                     sensNormalTarget /= ratio
-                    jsLogger.debug("ISF adjusted by %.2f due to %s TT of %d",
-                                   1.0/ratio,
+                    jsLogger.debug("ISF and ratio adjusted by %.2f due to %s TT of %d",
+                                   1.0/correction,
                                    if (targetBg > bgNormalTarget) "high" else "low",
                                    targetBg.toInt())
                 }

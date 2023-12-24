@@ -276,9 +276,9 @@ var getIsfByProfile = function (bg, profile, useCap) {
             profile.getIsfMgdl() * profileScale,
             profileSwitch,
             targetBg,
-            insulinDivisor, glucoseStatus, tempTargetSet, this.profile)
+            insulinDivisor, glucoseStatus, tempTargetSet, autosensDataRatio, this.profile)
 
-        autosensData.put("ratio", autosensDataRatio * isf.ratio)
+        autosensData.put("ratio", isf.ratio)
         this.profile.put("normalTarget", normalTarget)
 
         this.microBolusAllowed = microBolusAllowed
