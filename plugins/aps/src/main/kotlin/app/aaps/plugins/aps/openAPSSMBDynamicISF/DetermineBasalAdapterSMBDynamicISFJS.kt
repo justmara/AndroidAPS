@@ -151,9 +151,9 @@ var getIsfByProfile = function (bg, profile) {
             profile.getIsfMgdl(),
             if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100,
             targetBg,
-            insulinDivisor, glucoseStatus, tempTargetSet, this.profile)
+            insulinDivisor, glucoseStatus, tempTargetSet, autosensDataRatio, this.profile)
 
-        autosensData.put("ratio", autosensDataRatio * isf.ratio)
+        autosensData.put("ratio", isf.ratio)
         this.profile.put("normalTarget", 99)
 
         this.microBolusAllowed = microBolusAllowed
