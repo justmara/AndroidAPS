@@ -1105,6 +1105,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
 
     private fun updateSensitivity() {
         _binding ?: return
+        val onMain =sp.getBoolean(app.aaps.core.utils.R.string.key_used_autosens_on_main_phone, false)
         val lastAutosensData = overviewData.lastAutosensData(iobCobCalculator)
         if (config.NSCLIENT && sp.getBoolean(app.aaps.core.utils.R.string.key_used_autosens_on_main_phone, false) ||
             !config.NSCLIENT && constraintChecker.isAutosensModeEnabled().value()) {
