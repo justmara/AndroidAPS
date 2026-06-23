@@ -277,10 +277,18 @@ class EquilBLE @Inject constructor(
         if (isConnected && baseCmd.isPairStep()) {
             ready()
         } else if (isConnected) {
-            preCmd?.let { preCmd ->
-                baseCmd.runCode = preCmd.runCode
-                baseCmd.runPwd = preCmd.runPwd
+            val prevCmd = preCmd
+            if (prevCmd != null) {
+                baseCmd.runCode = prevCmd.runCode
+                baseCmd.runPwd = prevCmd.runPwd
                 nextCmd2()
+            } else {
+                // The GATT link was opened by the queue's connect() phase, which leaves no prior
+                // command context (baseCmd/preCmd are null, so the connect-time ready() was a no-op).
+                // Send this command as the first one on the open connection instead of silently
+                // dropping it - otherwise the pump receives nothing and idle-disconnects (status 19),
+                // surfacing as a bolus/command timeout. See issue #4910.
+                ready()
             }
         } else {
             findEquil(mac)
