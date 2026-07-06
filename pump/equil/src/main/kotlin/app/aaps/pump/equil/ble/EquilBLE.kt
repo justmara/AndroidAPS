@@ -240,9 +240,11 @@ class EquilBLE @Inject constructor(
     }
 
     fun closeBleAuto() {
-        handler.postDelayed({
-            disconnect()
-        }, EquilConst.EQUIL_BLE_NEXT_CMD)
+        // Tear down immediately. The AAPS command queue owns the connection lifecycle: after the last
+        // command it holds the link for waitForDisconnectionInSeconds() (5 s) for reuse and only then
+        // calls Pump.disconnect() -> here. No extra driver-side linger is needed, and an immediate
+        // teardown avoids the mid-command race that a deferred, cancellable timer would introduce.
+        disconnect()
     }
 
     var autoScan = true
