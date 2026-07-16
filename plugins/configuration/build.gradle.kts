@@ -31,6 +31,12 @@ dependencies {
     api(libs.androidx.work.runtime)
     // Maintenance
     api(libs.androidx.gridlayout)
+    
+    // HTTP client for Google Drive API
+    implementation(libs.com.squareup.okhttp3.okhttp)
+
+    // Chrome Custom Tabs for OAuth flow
+    api(libs.androidx.browser)
 
     // HTTP client for Google Drive API
     implementation(libs.com.squareup.okhttp3.okhttp)

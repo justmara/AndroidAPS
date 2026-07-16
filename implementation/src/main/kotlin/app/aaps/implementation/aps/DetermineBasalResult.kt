@@ -1,4 +1,3 @@
-// Modified for Eating Now
 package app.aaps.implementation.aps
 
 import android.text.Spanned

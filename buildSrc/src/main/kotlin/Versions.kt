@@ -1,11 +1,11 @@
-// Modified for Eating Now
 import org.gradle.api.JavaVersion
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 @Suppress("ConstPropertyName")
 object Versions {
 
-    const val appVersion = "3.4.2.2"+"-EatingNow"
+    // On change edit aaps-ci.yml
+    const val appVersion = "3.4.2.3"
     const val versionCode = 1500
 
     const val compileSdk = 36

@@ -1,4 +1,3 @@
-// Modified for Eating Now
 package app.aaps.core.keys
 
 import app.aaps.core.keys.interfaces.BooleanPreferenceKey
@@ -135,4 +134,5 @@ enum class BooleanKey(
     EatingNow_UseISFscaler("UseISFscaler", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     EatingNow_AutoStart("AutostartEN", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     EatingNow_AllowUAMplusNoENW("EatingNow_AllowUAMplusNoENW", false, defaultedBySM = true, hideParentScreenIfHidden = true)
+
 }

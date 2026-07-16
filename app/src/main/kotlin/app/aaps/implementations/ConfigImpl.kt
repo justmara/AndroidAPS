@@ -1,4 +1,3 @@
-// Modified for Eating Now
 package app.aaps.implementations
 
 import android.os.Build
@@ -39,13 +38,13 @@ class ConfigImpl @Inject constructor(
 
     override var appInitialized: Boolean = false
 
-    //private var isEngineeringMode: Boolean? = null
-    private var isEngineeringMode = true
+    private var isEngineeringMode: Boolean? = null
     private var isUnfinishedMode: Boolean? = null
     private var showUserActionsOnWatchOnly: Boolean? = null
     private var ignoreNightscoutV3Errors: Boolean? = null
     private var doNotSendSmsOnProfileChange: Boolean? = null
     private var enableAutotune: Boolean? = null
+    private var enableOmnipodDriftCompensation: Boolean? = null
     private var disableLeakCanary: Boolean? = null
 
     override fun isEngineeringModeOrRelease(): Boolean = if (!APS) true else isEngineeringMode() || !isDev()
@@ -56,5 +55,6 @@ class ConfigImpl @Inject constructor(
     override fun ignoreNightscoutV3Errors(): Boolean = ignoreNightscoutV3Errors ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("ignore_nightscout_v3_errors") != null).also { ignoreNightscoutV3Errors = it }
     override fun doNotSendSmsOnProfileChange(): Boolean = doNotSendSmsOnProfileChange ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("do_not_send_sms_on_profile_change") != null).also { doNotSendSmsOnProfileChange = it }
     override fun enableAutotune(): Boolean = enableAutotune ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("enable_autotune") != null).also { enableAutotune = it }
+    override fun enableOmnipodDriftCompensation(): Boolean = enableOmnipodDriftCompensation ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("omnipod_drift_compensation") != null).also { enableOmnipodDriftCompensation = it }
     override fun disableLeakCanary(): Boolean = disableLeakCanary ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("disable_leakcanary") != null).also { disableLeakCanary = it }
 }

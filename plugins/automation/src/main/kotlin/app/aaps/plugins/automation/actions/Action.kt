@@ -1,4 +1,3 @@
-// Modified for Eating Now
 package app.aaps.plugins.automation.actions
 
 import android.widget.LinearLayout
@@ -69,8 +68,7 @@ abstract class Action(val injector: HasAndroidInjector) {
                 ActionRunAutotune::class.java.simpleName          -> ActionRunAutotune(injector).fromJSON(data.toString())
                 ActionSendSMS::class.java.simpleName              -> ActionSendSMS(injector).fromJSON(data.toString())
                 ActionStartTempTarget::class.java.simpleName      -> ActionStartTempTarget(injector).fromJSON(data.toString())
-                ActionStartENTempTarget::class.java.simpleName    -> ActionStartENTempTarget(injector).fromJSON(data.toString())
-                ActionBasalCancel::class.java.simpleName          -> ActionBasalCancel(injector).fromJSON(data.toString())
+                ActionStopProcessing::class.java.simpleName       -> ActionStopProcessing(injector).fromJSON(data.toString())
                 ActionStopTempTarget::class.java.simpleName       -> ActionStopTempTarget(injector).fromJSON(data.toString())
                 else                                              -> throw ClassNotFoundException(type)
             }

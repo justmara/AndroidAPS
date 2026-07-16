@@ -1,4 +1,3 @@
-// Modified for Eating Now
 package app.aaps.core.keys
 
 import app.aaps.core.keys.interfaces.BooleanPreferenceKey
@@ -24,9 +23,5 @@ enum class UnitDoubleKey(
     OverviewHypoTarget("hypo_target", 160.0, 108, 180, defaultedBySM = true),
     OverviewLowMark("low_mark", 72.0, 25, 160, showInNsClientMode = false, hideParentScreenIfHidden = true),
     OverviewHighMark("high_mark", 180.0, 90, 250, showInNsClientMode = false),
-    ApsLgsThreshold("lgsThreshold", 65.0, 60, 100, defaultedBySM = true, dependency = BooleanKey.ApsUseDynamicSensitivity),
-
-    // Eating Now
-    OverviewEatingNowIOB("enw_max_iob", 0.0, 0, 10, defaultedBySM = true, hideParentScreenIfHidden = true),
-    OverviewEatingNowPreBolus("eatingnow_prebolus", 0.0, 0, 10, defaultedBySM = true, hideParentScreenIfHidden = true)
+    ApsLgsThreshold("lgsThreshold", 65.0, 60, 100, defaultedBySM = true, dependency = BooleanKey.ApsUseDynamicSensitivity)
 }
