@@ -73,6 +73,11 @@ enum class IntKey(
     NsClientUrgentAlarmStaleData("ns_alarm_urgent_stale_data_value", 31, 30, 180),
 
     SiteRotationUserProfile("site_rotation_user_profile", 0, 0, 2),
+
+
+    // Eating Now
+
+    // General
     Eatingnow_timestart("eatingnow_timestart", 9, 0, 23, defaultedBySM = true),
     Eatingnow_timeend("eatingnow_timeend", 17, 0, 23, defaultedBySM = true),
 

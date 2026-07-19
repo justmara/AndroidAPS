@@ -236,6 +236,8 @@ class TranslatorImpl @Inject internal constructor(
         TT.Reason.ACTIVITY     -> rh.gs(R.string.activity)
         TT.Reason.AUTOMATION   -> rh.gs(R.string.automation)
         TT.Reason.WEAR         -> rh.gs(R.string.wear)
+        TT.Reason.EATING_NOW  -> rh.gs(R.string.eatingnow)
+        TT.Reason.EATING_NOW_PB  -> rh.gs(R.string.eatingnow_prebolus)
 
         else                   -> rh.gs(R.string.unknown)
     }
