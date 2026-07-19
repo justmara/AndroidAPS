@@ -228,6 +228,12 @@
         <item name="iobPredASColor">@color/iobPredAS</item>
         <item name="bgiColor">@color/bgi</item>
         <item name="ratioColor">@color/ratio</item>
+        <item name="acceIsfColor">@color/acceIsfColor</item>
+        <item name="bgIsfColor">@color/bgIsfColor</item>
+        <item name="ppIsfColor">@color/ppIsfColor</item>
+        <item name="duraIsfColor">@color/duraIsfColor</item>
+        <item name="finalIsfColor">@color/finalIsfColor</item>
+        <item name="iobThColor">@color/iobThColor</item>
         <item name="activityColor">@color/activity</item>
         <item name="baseBasalColor">@color/baseBasal</item>
         <item name="dotLineColor">@color/white</item>

@@ -110,7 +110,10 @@ class ProfilePlugin @Inject constructor(
                 ToastUtils.errorToast(activity, rh.gs(R.string.missing_profile_name))
                 return false
             }
-            if (blockFromJsonArray(ic, dateUtil)?.all { it.amount < hardLimits.minIC() || it.amount > hardLimits.maxIC() } != false) {
+            // Error if ANY IC block is out of range (mirrors the ISF/target checks below). The previous
+            // `all { out-of-range } != false` only flagged a profile where EVERY block was invalid, so a
+            // single bad IC hour passed validation.
+            if (blockFromJsonArray(ic, dateUtil)?.all { it.amount >= hardLimits.minIC() && it.amount <= hardLimits.maxIC() } == false) {
                 ToastUtils.errorToast(activity, rh.gs(R.string.error_in_ic_values))
                 return false
             }
@@ -121,7 +124,7 @@ class ProfilePlugin @Inject constructor(
                     ToastUtils.errorToast(activity, rh.gs(R.string.error_in_isf_values))
                     return false
                 }
-                if (blockFromJsonArray(basal, dateUtil)?.all { it.amount < pumpDescription.basalMinimumRate || it.amount > 10.0 } != false) {
+                if (blockFromJsonArray(basal, dateUtil)?.all { it.amount >= pumpDescription.basalMinimumRate && it.amount <= hardLimits.maxBasal() } == false) {
                     ToastUtils.errorToast(activity, rh.gs(R.string.error_in_basal_values))
                     return false
                 }
@@ -138,7 +141,7 @@ class ProfilePlugin @Inject constructor(
                     ToastUtils.errorToast(activity, rh.gs(R.string.error_in_isf_values))
                     return false
                 }
-                if (blockFromJsonArray(basal, dateUtil)?.all { it.amount < pumpDescription.basalMinimumRate || it.amount > 10.0 } != false) {
+                if (blockFromJsonArray(basal, dateUtil)?.all { it.amount >= pumpDescription.basalMinimumRate && it.amount <= hardLimits.maxBasal() } == false) {
                     ToastUtils.errorToast(activity, rh.gs(R.string.error_in_basal_values))
                     return false
                 }
@@ -300,6 +303,113 @@ class ProfilePlugin @Inject constructor(
         }
         return false
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Profile-edit audit: diff the currently persisted profiles against the in-memory edited ones.
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Compare the persisted profiles (SharedPreferences) with the in-memory edited [profiles] and
+     * return, for each profile (matched by name) whose DIA / IC / ISF / basal / target changed, a
+     * `name to humanReadableDiff` pair. The diff text is prefixed with the profile name (and
+     * ` [active]` if it is the running profile) and lists each changed segment on its own line.
+     *
+     * MUST be called BEFORE [storeSettings] overwrites the preferences. Profiles with no persisted
+     * counterpart (newly added / cloned / renamed) are skipped — those are not parameter edits.
+     */
+    @Synchronized
+    fun profileEditNotes(): List<Pair<String, String>> {
+        val old = loadPersistedProfilesByName()
+        val activeName = profileFunction.getOriginalProfileName()
+        val result = mutableListOf<Pair<String, String>>()
+        for (p in profiles) {
+            val previous = old[p.name] ?: continue
+            val diff = buildProfileDiffNote(previous, p) ?: continue
+            val prefix = if (p.name == activeName) "${p.name} [active]" else p.name
+            result.add(p.name to "$prefix: $diff")
+        }
+        return result
+    }
+
+    private fun loadPersistedProfilesByName(): Map<String, ProfileSource.SingleProfile> {
+        val map = LinkedHashMap<String, ProfileSource.SingleProfile>()
+        val n = preferences.get(ProfileIntKey.AmountOfProfiles)
+        for (i in 0 until n) {
+            try {
+                val name = preferences.get(ProfileComposedStringKey.LocalProfileNumberedName, i)
+                map[name] = ProfileSource.SingleProfile(
+                    name = name,
+                    mgdl = preferences.get(ProfileComposedBooleanKey.LocalProfileNumberedMgdl, i),
+                    dia = preferences.get(ProfileComposedDoubleKey.LocalProfileNumberedDia, i),
+                    ic = JSONArray(preferences.get(ProfileComposedStringKey.LocalProfileNumberedIc, i)),
+                    isf = JSONArray(preferences.get(ProfileComposedStringKey.LocalProfileNumberedIsf, i)),
+                    basal = JSONArray(preferences.get(ProfileComposedStringKey.LocalProfileNumberedBasal, i)),
+                    targetLow = JSONArray(preferences.get(ProfileComposedStringKey.LocalProfileNumberedTargetLow, i)),
+                    targetHigh = JSONArray(preferences.get(ProfileComposedStringKey.LocalProfileNumberedTargetHigh, i))
+                )
+            } catch (e: JSONException) {
+                aapsLogger.error("Exception", e)
+            }
+        }
+        return map
+    }
+
+    /** Build a multi-line `IC:\n  06:00 8→9` style diff, or null if nothing changed. */
+    private fun buildProfileDiffNote(old: ProfileSource.SingleProfile, new: ProfileSource.SingleProfile): String? {
+        val parts = mutableListOf<String>()
+        if (old.dia != new.dia) parts.add("DIA ${formatAmount(old.dia)}→${formatAmount(new.dia)}")
+        addBlockDiff(parts, "IC", old.ic, new.ic)
+        addBlockDiff(parts, "ISF", old.isf, new.isf)
+        addBlockDiff(parts, "Basal", old.basal, new.basal)
+        addBlockDiff(parts, "TargetLow", old.targetLow, new.targetLow)
+        addBlockDiff(parts, "TargetHigh", old.targetHigh, new.targetHigh)
+        return parts.takeIf { it.isNotEmpty() }?.joinToString("; ")
+    }
+
+    private fun addBlockDiff(parts: MutableList<String>, label: String, oldJson: JSONArray, newJson: JSONArray) {
+        // JSON string compare catches any change to amounts OR time segmentation.
+        // Single line: the classic GraphView label is drawn with Canvas.drawText, which does not
+        // render newlines, so the note must stay on one line.
+        if (oldJson.toString() == newJson.toString()) return
+        val segments = diffSegments(oldJson, newJson)
+        if (segments.isNotEmpty()) parts.add("$label ${segments.joinToString(", ")}")
+    }
+
+    /**
+     * Compare two schedules segment-by-segment (keyed by start time) and return only the lines
+     * that actually differ, e.g. `04:00 0.6→0.9`. Added segments show `added`, removed `removed`.
+     */
+    private fun diffSegments(oldJson: JSONArray, newJson: JSONArray): List<String> {
+        val old = toTimeValueMap(oldJson)
+        val new = toTimeValueMap(newJson)
+        // Zero-padded "HH:mm" sorts chronologically as plain strings.
+        return (old.keys + new.keys).toSortedSet().mapNotNull { time ->
+            val o = old[time]
+            val n = new[time]
+            when {
+                o == null && n != null           -> "$time added ${formatAmount(n)}"
+                n == null && o != null           -> "$time removed ${formatAmount(o)}"
+                o != null && n != null && o != n -> "$time ${formatAmount(o)}→${formatAmount(n)}"
+                else                             -> null
+            }
+        }
+    }
+
+    private fun toTimeValueMap(json: JSONArray): Map<String, Double> {
+        val map = LinkedHashMap<String, Double>()
+        try {
+            for (i in 0 until json.length()) {
+                val o = json.getJSONObject(i)
+                map[o.getString("time")] = o.getDouble("value")
+            }
+        } catch (e: JSONException) {
+            aapsLogger.error(LTag.PROFILE, "Failed to parse profile schedule for diff", e)
+        }
+        return map
+    }
+
+    private fun formatAmount(value: Double): String =
+        if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
     /*
         {

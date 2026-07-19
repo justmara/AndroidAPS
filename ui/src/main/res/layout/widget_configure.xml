@@ -45,6 +45,13 @@
         android:max="255" />
 
     <CheckBox
+        android:id="@+id/status_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="@string/configure_statuslights" />
+
+    <CheckBox
         android:id="@+id/useBlack"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

@@ -29,6 +29,9 @@ dependencies {
     api(libs.androidx.gridlayout)
     api(kotlin("reflect"))
 
+    // Health Connect — HR + steps ingest path (Boost V6)
+    implementation(libs.androidx.health.connect)
+
     // APS (it should be androidTestImplementation but it doesn't work)
     api(libs.org.mozilla.rhino)
 

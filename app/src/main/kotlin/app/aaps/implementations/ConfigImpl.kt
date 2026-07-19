@@ -5,6 +5,8 @@ import app.aaps.BuildConfig
 import app.aaps.R
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.maintenance.FileListProvider
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.interfaces.Preferences
 import dagger.Lazy
 import dagger.Reusable
 import javax.inject.Inject
@@ -12,11 +14,13 @@ import javax.inject.Inject
 @Suppress("KotlinConstantConditions")
 @Reusable
 class ConfigImpl @Inject constructor(
-    private val fileListProvider: Lazy<FileListProvider>
+    private val fileListProvider: Lazy<FileListProvider>,
+    private val preferences: Lazy<Preferences>,
 ) : Config {
 
     override val SUPPORTED_NS_VERSION = 150000 // 15.0.0
-    override val APS = BuildConfig.FLAVOR == "full"
+    override val ADVANCED = BuildConfig.FLAVOR == "advanced"
+    override val APS = BuildConfig.FLAVOR == "full" || BuildConfig.FLAVOR == "advanced"
     override val AAPSCLIENT = BuildConfig.FLAVOR == "aapsclient" || BuildConfig.FLAVOR == "aapsclient2"
     override val AAPSCLIENT1 = BuildConfig.FLAVOR == "aapsclient"
     override val AAPSCLIENT2 = BuildConfig.FLAVOR == "aapsclient2"
@@ -24,6 +28,8 @@ class ConfigImpl @Inject constructor(
     override val PUMPDRIVERS = BuildConfig.FLAVOR == "full" || BuildConfig.FLAVOR == "pumpcontrol"
     override val FLAVOR = BuildConfig.FLAVOR
     override val VERSION_NAME = BuildConfig.VERSION_NAME
+    override val CUSTOM_PATCH_VERSION = BuildConfig.CUSTOM_PATCH_VERSION
+    override val DISPLAY_VERSION_NAME = VERSION_NAME + "-" + CUSTOM_PATCH_VERSION
     override val HEAD = BuildConfig.HEAD
     override val COMMITTED = BuildConfig.COMMITTED.toBoolean()
     override val BUILD_VERSION = BuildConfig.BUILDVERSION
@@ -48,12 +54,12 @@ class ConfigImpl @Inject constructor(
     private var disableLeakCanary: Boolean? = null
 
     override fun isEngineeringModeOrRelease(): Boolean = if (!APS) true else isEngineeringMode() || !isDev()
-    override fun isEngineeringMode(): Boolean = isEngineeringMode ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("engineering_mode") != null).also { isEngineeringMode = it }
+    override fun isEngineeringMode(): Boolean = preferences.get().get(BooleanKey.EngineeringMode) || isEngineeringMode ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("engineering_mode") != null).also { isEngineeringMode = it }
     override fun isUnfinishedMode(): Boolean = isUnfinishedMode ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("unfinished_mode") != null).also { isUnfinishedMode = it }
     override fun isDev(): Boolean = (VERSION.contains("-") || VERSION.matches(Regex(".*[a-zA-Z]+.*"))) && !VERSION.contains("-beta") && !VERSION.contains("-rc")
     override fun showUserActionsOnWatchOnly(): Boolean = showUserActionsOnWatchOnly ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("show_user_actions_on_watch_only") != null).also { showUserActionsOnWatchOnly = it }
-    override fun ignoreNightscoutV3Errors(): Boolean = ignoreNightscoutV3Errors ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("ignore_nightscout_v3_errors") != null).also { ignoreNightscoutV3Errors = it }
-    override fun doNotSendSmsOnProfileChange(): Boolean = doNotSendSmsOnProfileChange ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("do_not_send_sms_on_profile_change") != null).also { doNotSendSmsOnProfileChange = it }
+    override fun ignoreNightscoutV3Errors(): Boolean = preferences.get().get(BooleanKey.NsClient3IgnoreErrors) || ignoreNightscoutV3Errors ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("ignore_nightscout_v3_errors") != null).also { ignoreNightscoutV3Errors = it }
+    override fun doNotSendSmsOnProfileChange(): Boolean = !preferences.get().get(BooleanKey.SmsReportProfileSwitch) || doNotSendSmsOnProfileChange ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("do_not_send_sms_on_profile_change") != null).also { doNotSendSmsOnProfileChange = it }
     override fun enableAutotune(): Boolean = enableAutotune ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("enable_autotune") != null).also { enableAutotune = it }
     override fun enableOmnipodDriftCompensation(): Boolean = enableOmnipodDriftCompensation ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("omnipod_drift_compensation") != null).also { enableOmnipodDriftCompensation = it }
     override fun disableLeakCanary(): Boolean = disableLeakCanary ?: (fileListProvider.get().ensureExtraDirExists()?.findFile("disable_leakcanary") != null).also { disableLeakCanary = it }

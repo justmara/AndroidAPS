@@ -56,6 +56,14 @@ fun TB.toStringShort(rh: ResourceHelper): String =
     if (isAbsolute || type == TB.Type.FAKE_EXTENDED) rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, rate)
     else rh.gs(app.aaps.core.ui.R.string.formatPercent, rate)
 
+fun TB.toStringShort(forcePercentage: Boolean, profileBasal: Double, rh: ResourceHelper): String =
+    if (isAbsolute || type == TB.Type.FAKE_EXTENDED)
+        if (forcePercentage) rh.gs(app.aaps.core.ui.R.string.formatPercent, rate / profileBasal * 100)
+        else rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, rate)
+    else // percent
+        if (forcePercentage) rh.gs(app.aaps.core.ui.R.string.formatPercent, rate)
+        else rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, profileBasal * rate / 100)
+
 fun TB.iobCalc(time: Long, profile: Profile, insulinInterface: Insulin): IobTotal {
     if (!isValid) return IobTotal(time)
     val result = IobTotal(time)

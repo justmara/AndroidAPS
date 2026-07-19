@@ -15,6 +15,7 @@
 
     <!--    Widget-->
     <string name="configure">Configure opacity</string>
+    <string name="configure_statuslights">Enable status lights</string>
     <string name="widget_description">AAPS widget</string>
 
     <!--     Activities-->
@@ -76,6 +77,7 @@
     <string name="percentage_label">Percentage</string>
 
     <!-- LoopDialog -->
+    <string name="suspendloopfor15m">Suspend loop for 15 mins</string>
     <string name="suspendloopfor1h">Suspend loop for 1h</string>
     <string name="suspendloopfor2h">Suspend loop for 2h</string>
     <string name="suspendloopfor3h">Suspend loop for 3h</string>
@@ -121,6 +123,8 @@
     <string name="hide_invalidated_records">Hide invalidated / removed records</string>
     <string name="show_invalidated">Show invalidated</string>
     <string name="hide_invalidated">Hide invalidated</string>
+    <string name="show_profile_changes">Show profile changes</string>
+    <string name="hide_profile_changes">Hide profile changes</string>
     <string name="careportal_remove_started_events">Remove AAPS started entries</string>
     <string name="hide_loop">Hide loop</string>
     <string name="show_loop">Show loop</string>

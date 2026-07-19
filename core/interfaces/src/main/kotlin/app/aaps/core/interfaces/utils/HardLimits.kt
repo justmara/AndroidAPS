@@ -7,9 +7,9 @@ interface HardLimits {
 
         // Very Hard Limits Ranges
         // First value is the Lowest and second value is the Highest a Limit can define
-        val LIMIT_MIN_BG = doubleArrayOf(80.0, 180.0)
-        val LIMIT_MAX_BG = doubleArrayOf(90.0, 200.0)
-        val LIMIT_TARGET_BG = doubleArrayOf(80.0, 200.0)
+        val LIMIT_MIN_BG = doubleArrayOf(72.0, 180.0)
+        val LIMIT_MAX_BG = doubleArrayOf(72.0, 200.0)
+        val LIMIT_TARGET_BG = doubleArrayOf(72.0, 200.0)
 
         // Very Hard Limits Ranges for Temp Targets
         val LIMIT_TEMP_MIN_BG = doubleArrayOf(72.0, 180.0)

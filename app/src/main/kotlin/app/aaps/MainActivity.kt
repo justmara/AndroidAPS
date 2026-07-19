@@ -1,6 +1,7 @@
 // Modified for Eating Now
 package app.aaps
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
@@ -146,7 +147,7 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
             .observeOn(aapsSchedulers.main)
             .subscribe({
                            // 1st run of app
-                           start()
+                           runStartOnce()
                        }, fabricPrivacy::logException)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -204,10 +205,11 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
                         if (config.isUnfinishedMode()) message += "\nUnfinished mode enabled"
                         if (!fabricPrivacy.fabricEnabled()) message += "\n${rh.gs(app.aaps.core.ui.R.string.fabric_upload_disabled)}"
                         message += rh.gs(app.aaps.core.ui.R.string.about_link_urls)
+                        message += "\n\nTelegram:\nhttps://t.me/androidapsgroup"
                         val messageSpanned = SpannableString(message)
                         Linkify.addLinks(messageSpanned, Linkify.WEB_URLS)
                         MaterialAlertDialogBuilder(this@MainActivity, app.aaps.core.ui.R.style.DialogTheme)
-                            .setTitle(rh.gs(R.string.app_name) + " " + config.VERSION)
+                            .setTitle(rh.gs(R.string.app_name) + " " + config.VERSION_NAME)
                             .setIcon(iconsProvider.getIcon())
                             .setMessage(messageSpanned)
                             .setPositiveButton(rh.gs(app.aaps.core.ui.R.string.ok), null)
@@ -265,8 +267,21 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
         }
         mainMenuProvider?.let { addMenuProvider(it) }
         // Setup views on 2nd and next activity start
-        // On 1st start app is still initializing, start() is delayed and run from EventAppInitialized
-        if (config.appInitialized) setupViews()
+        // On 1st start app is still initializing, start() is delayed and run from EventAppInitialized.
+        // EventAppInitialized is a one-shot, non-replaying event though: if init already finished
+        // before this (possibly recreated) activity subscribed, the event was already missed and the
+        // setup wizard would never appear. So when init is already done, run start() directly here.
+        // runStartOnce() makes start() run exactly once per process regardless of which path fires it.
+        if (config.appInitialized) {
+            setupViews()
+            runStartOnce()
+        }
+    }
+
+    private fun runStartOnce() {
+        if (startCalled) return
+        startCalled = true
+        start()
     }
 
     private fun start() {
@@ -279,35 +294,9 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
                 startActivity(Intent(this, SetupWizardActivity::class.java).setAction("info.nightscout.androidaps.MainActivity"))
             })
         }
-        androidPermission.notifyForStoragePermission(this)
-        androidPermission.notifyForBatteryOptimizationPermission(this)
-        if (!config.AAPSCLIENT) androidPermission.notifyForLocationPermissions(this)
-        if (config.PUMPDRIVERS) {
-            if (smsCommunicator.isEnabled())
-                androidPermission.notifyForSMSPermissions(this)
-            androidPermission.notifyForSystemWindowPermissions(this)
-            androidPermission.notifyForBtConnectPermission(this)
-        }
+        reconcilePermissionNotifications()
         passwordResetCheck(this)
         exportPasswordResetCheck(this)
-
-        // // check if identification is set
-        // if (config.isDev() && preferences.get(StringKey.MaintenanceIdentification).isBlank())
-        //     uiInteraction.addNotificationWithAction(
-        //         id = Notification.IDENTIFICATION_NOT_SET,
-        //         text = rh.gs(R.string.identification_not_set),
-        //         level = Notification.INFO,
-        //         buttonText = R.string.set,
-        //         action = Runnable {
-        //             preferences.put(BooleanKey.GeneralSimpleMode, false)
-        //             startActivity(
-        //                 Intent(this@MainActivity, PreferencesActivity::class.java)
-        //                     .setAction("info.nightscout.androidaps.MainActivity")
-        //                     .putExtra(UiInteraction.PLUGIN_NAME, MaintenancePlugin::class.java.simpleName)
-        //             )
-        //         },
-        //         validityCheck = { config.isDev() && preferences.get(StringKey.MaintenanceIdentification).isBlank() }
-        //     )
 
         if (preferences.get(StringKey.ProtectionMasterPassword) == "")
             uiInteraction.addNotificationWithAction(
@@ -345,9 +334,37 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
         disposable.clear()
     }
 
+    // Re-check all permission notifications. Each notifyFor* adds the banner when the
+    // permission is missing and dismisses it once granted, so calling this on resume
+    // clears the banner after the user grants a permission and returns to the app.
+    private fun reconcilePermissionNotifications() {
+        androidPermission.notifyForStoragePermission(this)
+        androidPermission.notifyForBatteryOptimizationPermission(this)
+        androidPermission.notifyForExtStoragePermission(this)
+        if (!config.AAPSCLIENT) androidPermission.notifyForLocationPermissions(this)
+        if (config.PUMPDRIVERS) {
+            if (smsCommunicator.isEnabled())
+                androidPermission.notifyForSMSPermissions(this)
+            androidPermission.notifyForSystemWindowPermissions(this)
+            // notifyForBtConnectPermission's granted path launches the system "enable Bluetooth"
+            // dialog; calling it on every resume re-fired that dialog in a loop (screen flicker +
+            // device heating) on real pumps. Only show the banner while the permission is missing,
+            // and dismiss it directly once granted.
+            if (androidPermission.permissionNotGranted(this, Manifest.permission.BLUETOOTH_CONNECT) ||
+                androidPermission.permissionNotGranted(this, Manifest.permission.BLUETOOTH_SCAN))
+                androidPermission.notifyForBtConnectPermission(this)
+            else
+                uiInteraction.dismissNotification(Notification.PERMISSION_BT)
+        }
+        androidPermission.notifyForActivityRecognitionPermission(this)
+    }
+
     override fun onResume() {
         super.onResume()
-        if (config.appInitialized) binding.splash.visibility = View.GONE
+        if (config.appInitialized) {
+            binding.splash.visibility = View.GONE
+            reconcilePermissionNotifications()
+        }
         if (!isProtectionCheckActive) {
             isProtectionCheckActive = true
             protectionCheck.queryProtection(this, ProtectionCheck.Protection.APPLICATION, UIRunnable { isProtectionCheckActive = false },
@@ -481,9 +498,9 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
             .replace(".com/", ":")
             .replace(".org/", ":")
             .replace(".net/", ":")
-        fabricPrivacy.setUserProperty("Mode", config.APPLICATION_ID + "-" + closedLoopEnabled)
+        fabricPrivacy.setUserProperty("Mode", config.BUILD_TYPE + "-" + closedLoopEnabled)
         fabricPrivacy.setUserProperty("Language", preferences.getIfExists(StringKey.GeneralLanguage) ?: Locale.getDefault().language)
-        fabricPrivacy.setUserProperty("Version", config.VERSION_NAME)
+        fabricPrivacy.setUserProperty("Version", config.VERSION_NAME + "-" + config.CUSTOM_PATCH_VERSION)
         fabricPrivacy.setUserProperty("HEAD", BuildConfig.HEAD)
         fabricPrivacy.setUserProperty("Remote", remote)
         val hashes: List<String> = signatureVerifierPlugin.shortHashes()
@@ -497,7 +514,7 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
         activePlugin.activeInsulin.let { fabricPrivacy.setUserProperty("Insulin", it::class.java.simpleName) }
         // Add to crash log too
         FirebaseCrashlytics.getInstance().setCustomKey("HEAD", BuildConfig.HEAD)
-        FirebaseCrashlytics.getInstance().setCustomKey("Version", config.VERSION_NAME)
+        FirebaseCrashlytics.getInstance().setCustomKey("Version", config.DISPLAY_VERSION_NAME)
         FirebaseCrashlytics.getInstance().setCustomKey("BuildType", config.BUILD_TYPE)
         FirebaseCrashlytics.getInstance().setCustomKey("BuildFlavor", config.FLAVOR)
         FirebaseCrashlytics.getInstance().setCustomKey("Remote", remote)
@@ -538,6 +555,14 @@ class MainActivity : DaggerAppCompatActivityWithResult() {
             fh.delete()
             ToastUtils.okToast(context, context.getString(app.aaps.core.ui.R.string.datastore_password_cleared))
         }
+    }
+
+    companion object {
+        // start() shows the setup wizard and first-run notifications and must run exactly once per
+        // process. It is normally triggered by the one-shot EventAppInitialized, but a late or
+        // recreated activity may miss that event; this process-scoped flag lets such an activity run
+        // start() directly while still guaranteeing it never runs twice. Reset on a new process.
+        private var startCalled = false
     }
 
 }

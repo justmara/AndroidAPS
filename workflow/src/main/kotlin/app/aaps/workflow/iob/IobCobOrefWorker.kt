@@ -87,9 +87,25 @@ class IobCobOrefWorker @Inject internal constructor(
             val prevDataTime = ads.roundUpTime(bucketedData[bucketedData.size - 3].timestamp)
             aapsLogger.debug(LTag.AUTOSENS) { "Prev data time: " + dateUtil.dateAndTimeString(prevDataTime) }
             var previous = autosensDataTable[prevDataTime]
+            // Preload all expanded carbs for the whole detection window once, then filter per 5-min
+            // bucket in memory below. This replaces one blocking Room query per bucket (hundreds per
+            // run) with a single query. expand()+fromTo() are deterministic and the per-bucket filter
+            // uses the same inclusive window, so results are identical to calling
+            // getCarbsFromTimeToTimeExpanded() for each bucket. The wide margins are harmless because
+            // the per-bucket filter is exact.
+            val preloadCarbsStart = oldestTimeWithData - T.mins(10).msecs()
+            val preloadCarbsEnd = ads.roundUpTime(dateUtil.now())
+            val preloadedCarbs = persistenceLayer.getCarbsFromTimeToTimeExpanded(preloadCarbsStart, preloadCarbsEnd, true)
             // start from oldest to be able sub cob
+            var lastProgress = -1
             for (i in bucketedData.size - 4 downTo 0) {
-                rxBus.send(EventIobCalculationProgress(CalculationWorkflow.ProgressData.IOB_COB_OREF, 100 - (100.0 * i / bucketedData.size).toInt(), data.cause))
+                // Only emit when the integer percent actually changes to avoid flooding the
+                // UI thread with hundreds of identical progress events per calculation.
+                val progress = 100 - (100.0 * i / bucketedData.size).toInt()
+                if (progress != lastProgress) {
+                    lastProgress = progress
+                    rxBus.send(EventIobCalculationProgress(CalculationWorkflow.ProgressData.IOB_COB_OREF, progress, data.cause))
+                }
                 if (isStopped) {
                     aapsLogger.debug(LTag.AUTOSENS) { "Aborting calculation thread (trigger): ${data.reason}" }
                     return Result.failure(workDataOf("Error" to "Aborting calculation thread (trigger): ${data.reason}"))
@@ -184,7 +200,7 @@ class IobCobOrefWorker @Inject internal constructor(
                 }
                 // Use exclusive start (+1ms) to avoid double-counting carbs at window boundaries
                 // when consecutive 5-min windows share a boundary timestamp (issue #4596)
-                val recentCarbTreatments = persistenceLayer.getCarbsFromTimeToTimeExpanded(bgTime - T.mins(5).msecs() + 1, bgTime, true)
+                val recentCarbTreatments = preloadedCarbs.filter { it.timestamp in (bgTime - T.mins(5).msecs() + 1)..bgTime }
                 for (recentCarbTreatment in recentCarbTreatments) {
                     autosensData.carbsFromBolus += recentCarbTreatment.amount
                     val isAAPSOrWeighted = activePlugin.activeSensitivity.isMinCarbsAbsorptionDynamic

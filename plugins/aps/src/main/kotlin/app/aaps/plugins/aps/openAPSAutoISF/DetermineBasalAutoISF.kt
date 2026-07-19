@@ -11,6 +11,9 @@ import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
 import app.aaps.core.interfaces.aps.Predictions
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.profile.ProfileUtil
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.interfaces.Preferences
 import java.text.DecimalFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -25,6 +28,8 @@ import kotlin.math.roundToInt
 class DetermineBasalAutoISF @Inject constructor(
     private val profileUtil: ProfileUtil
 ) {
+
+    @Inject lateinit var preferences: Preferences
 
     private val consoleError = mutableListOf<String>()
     private val consoleLog = mutableListOf<String>()
@@ -146,12 +151,14 @@ class DetermineBasalAutoISF @Inject constructor(
         }
     }
 
+
     fun determine_basal(
         glucose_status: GlucoseStatus, currenttemp: CurrentTemp, iob_data_array: Array<IobTotal>, profile: OapsProfileAutoIsf, autosens_data: AutosensResult, meal_data: MealData,
         microBolusAllowed: Boolean, currentTime: Long, flatBGsDetected: Boolean, autoIsfMode: Boolean, loop_wanted_smb: String, profile_percentage: Int, smb_ratio: Double,
-        smb_max_range_extension: Double, iob_threshold_percent: Int, auto_isf_consoleError: MutableList<String>, auto_isf_consoleLog: MutableList<String>
+        smb_max_range_extension: Double, iob_threshold_percent: Int, activity_consoleLog: String = "", auto_isf_consoleError: MutableList<String>, auto_isf_consoleLog: MutableList<String>
     ): RT {
         consoleError.clear()
+        consoleError.add(activity_consoleLog)
         consoleLog.clear()
         var rT = RT(
             algorithm = APSResult.Algorithm.AUTO_ISF,
@@ -216,44 +223,49 @@ class DetermineBasalAutoISF @Inject constructor(
         var min_bg = profile.min_bg
         var max_bg = profile.max_bg
 
+        val activityRatio = preferences.get(DoubleKey.ActivityMonitorRatio)    // activityMonitor(profile, bg, target_bg)
+        val stepActivityDetected = preferences.get(BooleanKey.ActivityMonitorStepsActive)
+        val stepInactivityDetected = preferences.get(BooleanKey.ActivityMonitorStepsInactive)
         var sensitivityRatio = 1.0
-        // var origin_sens = ""
-        var exercise_ratio = 1.0
-        val high_temptarget_raises_sensitivity = profile.exercise_mode || profile.high_temptarget_raises_sensitivity
         val normalTarget = Constants.NORMAL_TARGET_MGDL // evaluate high/low temptarget against normal target, not scheduled target (which might change)
+        val exerciseModeActive = (profile.exercise_mode || profile.high_temptarget_raises_sensitivity) && profile.temptargetSet && target_bg > normalTarget
+        val resistanceModeActive = profile.low_temptarget_lowers_sensitivity && profile.temptargetSet && target_bg < normalTarget
         // when temptarget is 160 mg/dL, run 50% basal (120 = 75%; 140 = 60%),  80 mg/dL with low_temptarget_lowers_sensitivity would give 1.5x basal, but is limited to autosens_max (1.2x by default)
-        val halfBasalTarget = profile.half_basal_exercise_target
-
-        if (high_temptarget_raises_sensitivity && profile.temptargetSet && target_bg > normalTarget
-            || profile.low_temptarget_lowers_sensitivity && profile.temptargetSet && target_bg < normalTarget
-        ) {
-            // w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44
-            // e.g.: Sensitivity ratio set to 0.8 based on temp target of 120; Adjusting basal from 1.65 to 1.35; ISF from 58.9 to 73.6
-            //sensitivityRatio = 2/(2+(target_bg-normalTarget)/40);
-            val c = (halfBasalTarget - normalTarget).toDouble()
-            if (c * (c + target_bg - normalTarget) <= 0.0) {
-                sensitivityRatio = profile.autosens_max
-            } else {
-                sensitivityRatio = c / (c + target_bg - normalTarget)
-                // limit sensitivityRatio to profile.autosens_max (1.2x by default)
-                sensitivityRatio = min(sensitivityRatio, profile.autosens_max)
-                sensitivityRatio = round(sensitivityRatio, 2)
-                exercise_ratio = sensitivityRatio
-                // origin_sens = "from TT modifier"
+        // half_basal_exercise_target is kept as an Int in mg/dL in this port, so no unit conversion is required
+        val mgdlHalfBasalTarget = profile.half_basal_exercise_target.toDouble()
+        if ( exerciseModeActive || resistanceModeActive || stepActivityDetected || stepInactivityDetected ) {
+            if ( exerciseModeActive || resistanceModeActive ) {
+                // w/ target 100, temp target 110 = .89, 120 = 0.8, 140 = 0.67, 160 = .57, and 200 = .44
+                // e.g.: Sensitivity ratio set to 0.8 based on temp target of 120; Adjusting basal from 1.65 to 1.35; ISF from 58.9 to 73.6
+                val resistanceMax = min(1.5, profile.autosens_max)  // additional safety limit
+                val c = (mgdlHalfBasalTarget - normalTarget).toDouble()
+                if (c * (c + target_bg - normalTarget) <= 0.0) {
+                    sensitivityRatio = resistanceMax
+                } else {
+                    sensitivityRatio = c / (c + target_bg - normalTarget)
+                    // limit sensitivityRatio to profile.autosens_max (1.2x by default)
+                    sensitivityRatio = min(sensitivityRatio, resistanceMax)
+                    sensitivityRatio = round(sensitivityRatio, 2)
+                }
                 consoleError.add("Sensitivity ratio set to $sensitivityRatio based on temp target of $target_bg; ")
+            } else if ( stepActivityDetected ) {
+                sensitivityRatio = activityRatio
+            } else if ( stepInactivityDetected ) {
+                sensitivityRatio = activityRatio
             }
         } else {
+            consoleError.add("Sensitivity ratio unchanged: 1.0")
             sensitivityRatio = autosens_data.ratio
             consoleError.add("Autosens ratio: $sensitivityRatio; ")
         }
         var iobTH_reduction_ratio = 1.0
         if (iob_threshold_percent != 100) {
-            iobTH_reduction_ratio = profile_percentage / 100.0 * exercise_ratio     // later: * activityRatio;
+            iobTH_reduction_ratio = profile_percentage / 100.0 * sensitivityRatio   //exercise_ratio * activityRatio
         }
         basal = profile.current_basal * sensitivityRatio
         basal = round_basal(basal)
         if (basal != profile_current_basal)
-            consoleError.add("Adjusting basal from $profile_current_basal to $basal;")
+            consoleError.add("adjusting basal from $profile_current_basal to $basal;")
         else
             consoleError.add("Basal unchanged: $basal;")
 
@@ -305,6 +317,12 @@ class DetermineBasalAutoISF @Inject constructor(
                 //console.log(" (autosens ratio "+sensitivityRatio+")");
             }
         consoleError.add("CR: ${profile.carb_ratio}")
+
+        // Dynamic CR (ported from iAPS/Trio): the plugin computes a glucose-modulated carb ratio via the
+        // logarithmic/sigmoid formula. 0.0 means the feature is disabled, so fall back to the profile carb ratio.
+        // The plugin also builds a detailed line shown in the OpenAPS "Script debug" section.
+        if (profile.dynamicCarbRatioReason.isNotEmpty()) consoleError.add(profile.dynamicCarbRatioReason)
+        val carbRatio = if (profile.dynamicCarbRatio > 0.0) profile.dynamicCarbRatio else profile.carb_ratio
 
         if (autoIsfMode) {
             consoleError.add("----------------------------------")
@@ -389,14 +407,15 @@ class DetermineBasalAutoISF @Inject constructor(
 
         // min_bg of 90 -> threshold of 65, 100 -> 70 110 -> 75, and 130 -> 85
         var threshold = min_bg - 0.5 * (min_bg - 40)
-        // if (profile.lgsThreshold != null) {
-        //     val lgsThreshold = profile.lgsThreshold ?: error("lgsThreshold missing")
-        //     if (lgsThreshold > threshold) {
-        //         consoleError.add("Threshold set from ${convert_bg(threshold)} to ${convert_bg(lgsThreshold.toDouble())}; ")
-        //         threshold = lgsThreshold.toDouble()
-        //     }
-        // }
-
+        // Honor the user-configured low-glucose-suspend floor, exactly like DetermineBasalSMB does.
+        // Without this AutoISF users get a lower SMB-disable/suspend threshold than they configured.
+        if (profile.lgsThreshold != null) {
+            val lgsThreshold = profile.lgsThreshold ?: error("lgsThreshold missing")
+            if (lgsThreshold > threshold) {
+                consoleError.add("Threshold set from ${convert_bg(threshold)} to ${convert_bg(lgsThreshold.toDouble())}; ")
+                threshold = lgsThreshold.toDouble()
+            }
+        }
         //console.error(reservoir_data);
 
         rT = RT(
@@ -412,7 +431,9 @@ class DetermineBasalAutoISF @Inject constructor(
             sensitivityRatio = sensitivityRatio, // autosens ratio (fraction of normal basal)
             consoleLog = consoleLog,
             consoleError = consoleError,
-            variable_sens = profile.variable_sens
+            variable_sens = profile.variable_sens,
+            carbRatio = carbRatio,
+            carbRatioReason = profile.dynamicCarbRatioReason.ifEmpty { null }
         )
 
         // generate predicted future BGs based on IOB, COB, and current absorption rate
@@ -455,7 +476,7 @@ class DetermineBasalAutoISF @Inject constructor(
         // use autosens-adjusted sens to counteract autosens meal insulin dosing adjustments so that
         // autotuned CR is still in effect even when basals and ISF are being adjusted by TT or autosens
         // this avoids overdosing insulin for large meals when low temp targets are active
-        val csf = sens / profile.carb_ratio
+        val csf = sens / carbRatio
         consoleError.add("profile.sens: ${profile.sens}, sens: $sens, CSF: $csf")
 
         val maxCarbAbsorptionRate = 30 // g/h; maximum rate to assume carbs will absorb if no CI observed
@@ -500,6 +521,9 @@ class DetermineBasalAutoISF @Inject constructor(
         // area of the /\ triangle is the same as a remainingCIpeak-height rectangle out to remainingCATime/2
         // remainingCIpeak (mg/dL/5m) = remainingCarbs (g) * CSF (mg/dL/g) * 5 (m/5m) * 1h/60m / (remainingCATime/2) (h)
         val remainingCIpeak = remainingCarbs * csf * 5 / 60 / (remainingCATime / 2)
+        if (remainingCIpeak.isNaN()) {
+            throw Exception("remainingCarbs=$remainingCarbs remainingCATime=$remainingCATime profile.remainingCarbsCap=${profile.remainingCarbsCap} csf=$csf")
+        }
         //console.error(profile.min_5m_carbimpact,ci,totalCI,totalCA,remainingCarbs,remainingCI,remainingCATime);
 
         // calculate peak deviation in last hour, and slope from that to current deviation
@@ -573,6 +597,9 @@ class DetermineBasalAutoISF @Inject constructor(
             // and ending at remainingCATime h (remainingCATime*12 * 5m intervals)
             val intervals = Math.min(COBpredBGs.size.toDouble(), ((remainingCATime * 12) - COBpredBGs.size))
             val remainingCI = Math.max(0.0, intervals / (remainingCATime / 2 * 12) * remainingCIpeak)
+            if (remainingCI.isNaN()) {
+                throw Exception("remainingCI=$remainingCI intervals=$intervals remainingCIpeak=$remainingCIpeak")
+            }
             remainingCItotal += predCI + remainingCI
             remainingCIs.add(round(remainingCI))
             predCIs.add(round(predCI))
@@ -780,7 +807,7 @@ class DetermineBasalAutoISF @Inject constructor(
         rT.IOB = iob_data.iob
         rT.reason.append(
             "COB: ${round(meal_data.mealCOB, 1).withoutZeros()}, Dev: ${convert_bg(deviation.toDouble())}, BGI: ${convert_bg(bgi)}, ISF: ${convert_bg(sens)}, CR: ${
-                round(profile.carb_ratio, 2)
+                round(carbRatio, 2)
                     .withoutZeros()
             }, Target: ${convert_bg(target_bg)}, minPredBG ${convert_bg(minPredBG)}, minGuardBG ${convert_bg(minGuardBG)}, IOBpredBG ${convert_bg(lastIOBpredBG)}"
         )
@@ -1042,7 +1069,7 @@ class DetermineBasalAutoISF @Inject constructor(
             val maxBolus: Double
             if (microBolusAllowed && enableSMB && bg > threshold) {
                 // never bolus more than maxSMBBasalMinutes worth of basal
-                val mealInsulinReq = round(meal_data.mealCOB / profile.carb_ratio, 3)
+                val mealInsulinReq = round(meal_data.mealCOB / carbRatio, 3)
                 val smb_max_range = smb_max_range_extension
                 if (iob_data.iob > mealInsulinReq && iob_data.iob > 0) {
                     consoleError.add("IOB ${iob_data.iob} > COB ${meal_data.mealCOB}; mealInsulinReq = $mealInsulinReq")

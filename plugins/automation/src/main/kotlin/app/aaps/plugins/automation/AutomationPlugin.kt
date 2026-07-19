@@ -45,6 +45,7 @@ import app.aaps.plugins.automation.actions.ActionRunAutotune
 import app.aaps.plugins.automation.actions.ActionSMBChange
 import app.aaps.plugins.automation.actions.ActionSendSMS
 import app.aaps.plugins.automation.actions.ActionSettingsExport
+import app.aaps.plugins.automation.actions.ActionStartENTempTarget
 import app.aaps.plugins.automation.actions.ActionStartTempTarget
 import app.aaps.plugins.automation.actions.ActionStopProcessing
 import app.aaps.plugins.automation.actions.ActionStopTempTarget
@@ -91,6 +92,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.text.DecimalFormat
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -131,6 +133,9 @@ class AutomationPlugin @Inject constructor(
     private val automationEvents = ArrayList<AutomationEventObject>()
     var executionLog: MutableList<String> = ArrayList()
     var btConnects: MutableList<EventBTChange> = ArrayList()
+
+    // Guards against overlapping processActions() runs (see processActions()).
+    private val processingActions = AtomicBoolean(false)
 
     private var handler: Handler? = null
     private var refreshLoop: Runnable
@@ -207,14 +212,16 @@ class AutomationPlugin @Inject constructor(
 
     private fun storeToSP() {
         val array = JSONArray()
-        val iterator = synchronized(this) { automationEvents.toMutableList().iterator() }
-        try {
-            while (iterator.hasNext()) {
-                val event = iterator.next()
-                array.put(JSONObject(event.toJSON()))
+        // Build the JSON while holding the lock so a concurrent add/remove/set/swap (all @Synchronized)
+        // cannot structurally modify the list mid-serialization (CME / partially-written JSON).
+        synchronized(this) {
+            try {
+                for (event in automationEvents) {
+                    array.put(JSONObject(event.toJSON()))
+                }
+            } catch (e: JSONException) {
+                aapsLogger.error(LTag.AUTOMATION, "Failed to serialize automation events", e)
             }
-        } catch (e: JSONException) {
-            e.printStackTrace()
         }
 
         preferences.put(AutomationStringKey.AutomationEvents, array.toString())
@@ -228,12 +235,19 @@ class AutomationPlugin @Inject constructor(
             try {
                 val array = JSONArray(data)
                 for (i in 0 until array.length()) {
-                    val o = array.getJSONObject(i)
-                    val event = AutomationEventObject(injector).fromJSON(o.toString())
-                    automationEvents.add(event)
+                    // Per-event guard: fromJSON can throw beyond JSONException (unchecked cast to
+                    // TriggerConnector, enum valueOf on old/corrupt data). Skip the bad event instead
+                    // of aborting the whole load and losing every automation.
+                    try {
+                        val o = array.getJSONObject(i)
+                        val event = AutomationEventObject(injector).fromJSON(o.toString())
+                        automationEvents.add(event)
+                    } catch (e: Exception) {
+                        aapsLogger.error(LTag.AUTOMATION, "Skipping unparseable automation event $i", e)
+                    }
                 }
-            } catch (e: JSONException) {
-                e.printStackTrace()
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.AUTOMATION, "Failed to parse stored automation events", e)
             }
         else
             automationEvents.add(AutomationEventObject(injector).fromJSON(EMPTY_EVENT))
@@ -241,6 +255,23 @@ class AutomationPlugin @Inject constructor(
 
     internal fun processActions() {
         if (!config.appInitialized) return
+        // Prevent overlapping runs: processActions is invoked from the 150s loop AND from 5 rx io
+        // subscriptions (location/charging/network/BT). Without this guard two threads could execute
+        // the same event concurrently - each processEvent() sleeps several seconds and only sets
+        // event.lastRun afterwards - producing duplicate temp targets / profile switches / SMB toggles.
+        // A re-entrant call is skipped; the event is re-evaluated on the next trigger or the 150s loop.
+        if (!processingActions.compareAndSet(false, true)) {
+            aapsLogger.debug(LTag.AUTOMATION, "processActions already running - skipping re-entrant call")
+            return
+        }
+        try {
+            processActionsInternal()
+        } finally {
+            processingActions.set(false)
+        }
+    }
+
+    private fun processActionsInternal() {
         /**
          * Changed to false if some condition prevents automation from running.
          * In this case only system automations are enabled.
@@ -402,10 +433,9 @@ class AutomationPlugin @Inject constructor(
             ActionProfileSwitch(injector),
             ActionSendSMS(injector),
             ActionSMBChange(injector),
-            ActionStartENTempTarget(injector)
+            ActionStartENTempTarget(injector),
+            ActionRunAutotune(injector)
         )
-        if (config.isEngineeringMode() && config.isDev())
-            actions.add(ActionRunAutotune(injector))
 
         return actions.toList()
     }

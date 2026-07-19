@@ -3,7 +3,11 @@ package app.aaps.ui.widget
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.widget.CheckBox
+import android.widget.CompoundButton
 import android.widget.SeekBar
+import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.keys.BooleanComposedKey
 import app.aaps.core.keys.IntComposedKey
 import app.aaps.core.keys.interfaces.Preferences
@@ -40,6 +44,10 @@ class WidgetConfigureActivity : DaggerActivity() {
                 Widget.updateWidget(this@WidgetConfigureActivity, "WidgetConfigure")
             }
         })
+        binding.statusSwitch.setOnCheckedChangeListener { _, v ->
+            preferences.put(BooleanComposedKey.WidgetShowStatus, appWidgetId, value = v)
+            Widget.updateWidget(this, "WidgetConfigure")
+        }
 
         binding.closeLayout.close.setOnClickListener {
             // Make sure we pass back the original appWidgetId
@@ -65,6 +73,7 @@ class WidgetConfigureActivity : DaggerActivity() {
 
         binding.seekBar.progress = preferences.get(IntComposedKey.WidgetOpacity, appWidgetId)
         binding.useBlack.isChecked = preferences.get(BooleanComposedKey.WidgetUseBlack, appWidgetId)
+        binding.statusSwitch.isChecked = preferences.get(BooleanComposedKey.WidgetShowStatus, appWidgetId)
     }
 
     override fun onDestroy() {

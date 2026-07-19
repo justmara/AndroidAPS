@@ -117,6 +117,7 @@ class LoopDialog : DaggerDialogFragment() {
         binding.overviewDisable.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewResume.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewReconnect.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
+        binding.overviewSuspend15m.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewSuspend1h.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewSuspend2h.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewSuspend3h.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
@@ -126,6 +127,9 @@ class LoopDialog : DaggerDialogFragment() {
         binding.overviewDisconnect1h.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewDisconnect2h.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
         binding.overviewDisconnect3h.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
+        // Follower-only disconnect shortcuts in the loop row
+        binding.overviewDisconnect30mTop.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
+        binding.overviewDisconnect1hTop.setOnClickListener { if (showOkCancel) onClickOkCancelEnabled(it) else onClick(it); dismiss() }
 
         // cancel button
         binding.cancel.setOnClickListener { dismiss() }
@@ -189,8 +193,12 @@ class LoopDialog : DaggerDialogFragment() {
         binding.overviewResume.visibility = (allowedModes.contains(RM.Mode.RESUME) && runningMode == RM.Mode.SUSPENDED_BY_USER).toVisibility()
         binding.overviewDisable.visibility = allowedModes.contains(RM.Mode.DISABLED_LOOP).toVisibility()
         binding.overviewCloseloop.visibility = allowedModes.contains(RM.Mode.CLOSED_LOOP).toVisibility()
-        binding.overviewLgsloop.visibility = allowedModes.contains(RM.Mode.CLOSED_LOOP_LGS).toVisibility()
-        binding.overviewOpenloop.visibility = allowedModes.contains(RM.Mode.OPEN_LOOP).toVisibility()
+        // LGS / Open loop: master only. On AAPSClient followers they are replaced by the disconnect shortcuts below.
+        binding.overviewLgsloop.visibility = (allowedModes.contains(RM.Mode.CLOSED_LOOP_LGS) && config.APS).toVisibility()
+        binding.overviewOpenloop.visibility = (allowedModes.contains(RM.Mode.OPEN_LOOP) && config.APS).toVisibility()
+        // Disconnect shortcuts in the loop row: follower only (master keeps LGS/Open loop and its own disconnect section)
+        binding.overviewDisconnect30mTop.visibility = (allowedModes.contains(RM.Mode.DISCONNECTED_PUMP) && !config.APS && pumpDescription.tempDurationStep30mAllowed).toVisibility()
+        binding.overviewDisconnect1hTop.visibility = (allowedModes.contains(RM.Mode.DISCONNECTED_PUMP) && !config.APS).toVisibility()
 
         binding.overviewDisconnect15m.visibility = pumpDescription.tempDurationStep15mAllowed.toVisibility()
         binding.overviewDisconnect30m.visibility = pumpDescription.tempDurationStep30mAllowed.toVisibility()
@@ -212,13 +220,14 @@ class LoopDialog : DaggerDialogFragment() {
             R.id.overview_disable        -> description = rh.gs(app.aaps.core.ui.R.string.disableloop)
             R.id.overview_resume         -> description = rh.gs(R.string.resume)
             R.id.overview_reconnect      -> description = rh.gs(R.string.reconnect)
+            R.id.overview_suspend_15m    -> description = rh.gs(R.string.suspendloopfor15m)
             R.id.overview_suspend_1h     -> description = rh.gs(R.string.suspendloopfor1h)
             R.id.overview_suspend_2h     -> description = rh.gs(R.string.suspendloopfor2h)
             R.id.overview_suspend_3h     -> description = rh.gs(R.string.suspendloopfor3h)
             R.id.overview_suspend_10h    -> description = rh.gs(R.string.suspendloopfor10h)
             R.id.overview_disconnect_15m -> description = rh.gs(R.string.disconnectpumpfor15m)
-            R.id.overview_disconnect_30m -> description = rh.gs(R.string.disconnectpumpfor30m)
-            R.id.overview_disconnect_1h  -> description = rh.gs(R.string.disconnectpumpfor1h)
+            R.id.overview_disconnect_30m, R.id.overview_disconnect_30m_top -> description = rh.gs(R.string.disconnectpumpfor30m)
+            R.id.overview_disconnect_1h, R.id.overview_disconnect_1h_top   -> description = rh.gs(R.string.disconnectpumpfor1h)
             R.id.overview_disconnect_2h  -> description = rh.gs(R.string.disconnectpumpfor2h)
             R.id.overview_disconnect_3h  -> description = rh.gs(R.string.disconnectpumpfor3h)
         }

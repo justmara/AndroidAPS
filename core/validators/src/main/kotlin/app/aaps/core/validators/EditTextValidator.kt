@@ -67,5 +67,6 @@ interface EditTextValidator {
         const val TEST_MULTI_PHONE = 19
         const val TEST_PIN_STRENGTH = 20
         const val TEST_BG_RANGE = 21
+        const val TEST_TIME = 100
     }
 }

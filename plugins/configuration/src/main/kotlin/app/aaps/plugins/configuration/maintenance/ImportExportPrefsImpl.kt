@@ -80,7 +80,9 @@ import app.aaps.shared.impl.weardata.ZipWatchfaceFormat
 import dagger.Reusable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.json.JSONObject
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -124,6 +126,10 @@ class ImportExportPrefsImpl @Inject constructor(
         var cloudNextPageToken: String? = null
         var cloudTotalFilesCount: Int = 0  // Total count of settings files
     }
+
+    // Owns the non-interactive cloud-export coroutine. Was GlobalScope (orphaned, uncancellable);
+    // an instance-owned scope is at least GC'd with this object.
+    private val exportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override var selectedImportFile: PrefsFile? = null
 
@@ -602,7 +608,7 @@ class ImportExportPrefsImpl @Inject constructor(
         
         // Export to cloud if enabled
         if (exportToCloud) {
-            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            exportScope.launch {
                 try {
                     val provider = cloudStorageManager.getActiveProvider()
                     if (provider == null) {
@@ -874,15 +880,23 @@ class ImportExportPrefsImpl @Inject constructor(
                     PrefImportSummaryDialog.showSummary(activity, importOk, importPossible, prefs, {
                         if (importPossible) {
                             activePlugin.beforeImport()
-                            sp.clear()
-                            for ((key, value) in prefs.values) {
-                                if (value == "true" || value == "false") {
-                                    sp.putBoolean(key, value.toBoolean())
-                                } else {
-                                    sp.putString(key, value)
+                            // Single atomic, synchronous (commit = true) transaction. The previous
+                            // per-key sp.clear()/putXxx() calls each used apply() (async): exitProcess(0)
+                            // in restartAppAfterImport could kill the process before the QueuedWork flush
+                            // completed, so the relaunched process re-read stale values from disk and
+                            // startup-applied prefs (e.g. the Boost/new-UI flag in OverviewPlugin.onStart)
+                            // stayed unapplied. commit = true guarantees the imported prefs hit disk first.
+                            sp.edit(commit = true) {
+                                clear()
+                                for ((key, value) in prefs.values) {
+                                    if (value == "true" || value == "false") {
+                                        putBoolean(key, value.toBoolean())
+                                    } else {
+                                        putString(key, value)
+                                    }
                                 }
                             }
-                            
+
                             // All settings including Google Drive settings and export destination preferences
                             // are now imported from backup file. If tokens are invalid, user can re-authorize.
                             
@@ -923,7 +937,11 @@ class ImportExportPrefsImpl @Inject constructor(
             if (context is AppCompatActivity) {
                 context.finish()
             }
-            configBuilder.exitApp("Import", Sources.Maintenance, false)
+            // Relaunch (launchAgain = true), matching the "restarting app" dialog: a fresh process
+            // re-reads all imported preferences at startup. Without the relaunch, settings that are
+            // only applied on startup (e.g. the Boost/new-UI flag read in OverviewPlugin.onStart)
+            // stay unapplied until the user manually restarts or toggles them.
+            configBuilder.exitApp("Import", Sources.Maintenance, true)
         }
     }
 

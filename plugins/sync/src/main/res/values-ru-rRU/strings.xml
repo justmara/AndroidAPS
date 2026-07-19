@@ -25,10 +25,10 @@
     <!-- AAPSClient -->
     <string name="no_write_permission">NS не имеет разрешения внести изменения. неверный API secret?</string>
     <string name="ns_client_v3_short_name">NSv3</string>
-    <string name="ns_client">клиент NS</string>
+    <string name="ns_client">Клиент NS</string>
     <string name="ns_client_short_name">NSv1</string>
     <string name="ns_client_url">Адрес URL:</string>
-    <string name="restart">перезапуск</string>
+    <string name="restart">Перезапуск</string>
     <string name="ns_client_title">NSClientV1</string>
     <string name="ns_client_v3_title">NSClientV3</string>
     <string name="ns_client_url_title">URL-адрес Nightscout</string>
@@ -37,10 +37,10 @@
     <string name="ns_client_secret_dialog_message">Введите ключ API вашего Nightscout (мин. 12 символов; пароль, записанный в переменных вашего Nightscout)</string>
     <string name="nsclient_token_title">Код доступа Nightscout</string>
     <string name="nsclient_token_dialog_message">Введите код доступа с уровнем привилегий admin, созданный в инструментах администратора Nightscout (мин. 17 символов, не ключ вашего API)</string>
-    <string name="deliver_now">Подать сейчас</string>
-    <string name="queue">очередь</string>
-    <string name="status">состояние:</string>
-    <string name="clear_log">очистка лога</string>
+    <string name="deliver_now">Отправить сейчас</string>
+    <string name="queue">Очередь</string>
+    <string name="status">Состояние:</string>
+    <string name="clear_log">Очистка лога</string>
     <string name="full_sync">Полная синхронизация</string>
     <string name="full_sync_comment">Полная синхронизация? Это может занять много часов и до завершения вы не увидите новые данные в NS.</string>
     <string name="ns_sync_options">Синхронизация</string>
@@ -114,7 +114,7 @@
     <string name="no_watch_connected">(Часы не подключены)</string>
     <string name="pump_status">Статус помпы</string>
     <string name="loop_status">Статус цикла</string>
-    <string name="wizard_result">Мастер:\nИнсулин: %1$.2fед\nУгл: %2$dг</string>
+    <string name="wizard_result">Мастер:\nИнсулин: %1$.2fед\nУгл: %2$dг\nУгл через: %3$dмин</string>
     <string name="quick_wizard_not_available">Выбранный мастер быстрого доступа больше недоступен, обновите плитку</string>
     <string name="quick_wizard_message">Мастер: %1$s\nИнсулин: %2$.2fЕд\nУгл: %3$dg</string>
     <string name="user_action_not_available">Выбранное пользовательское действие %1$s более недоступно, пожалуйста, обновите плитку</string>
@@ -186,6 +186,7 @@
     <string name="wear_action_loop_state_unauthorized">Повторите попытку.</string>
     <string name="wear_action_loop_state_invalid">Запрошено неверное состояние цикла</string>
     <string name="wear_action_loop_state_title">СОСТОЯНИЕ ЦИКЛА</string>
+    <string name="wear_action_loop_state_changed">%1$s</string>
     <string name="wear_action_loop_state_changed_with_duration">%1$s\n Продолжительность: %2$d мин</string>
     <string name="wear_action_loop_state_now_closed">Закрыто</string>
     <string name="wear_action_loop_state_now_lgs">Приостановка на Низких</string>
@@ -193,10 +194,13 @@
     <string name="wear_action_loop_state_now_suspended">Приостановлено</string>
     <string name="wear_action_loop_state_now_resumed">Возобновлено</string>
     <string name="wear_action_loop_state_now_disabled">Неактивно</string>
+    <string name="wear_action_loop_state_now_enabled">Включен</string>
     <string name="wear_action_loop_state_now_pump_suspended">Работа помпы приостановлена</string>
     <string name="wear_action_loop_state_now_superbolus">Суперболюс</string>
     <string name="wear_action_loop_state_now_invalid">Недопустимое состояние</string>
     <string name="wear_action_loop_state_now_pump_disconnected">Помпа отключена</string>
+    <string name="wear_action_loop_state_now_pump_reconnected">Помпа переподключена</string>
+    <string name="ns_ignore_errors">Игнорировать ошибки сихнронизации</string>
     <string name="garmin_request_key">Ключ запроса</string>
     <string name="garmin_request_key_summary">Дополнительный ключ для безопасности соединения HTTP между устройством Garmin и AAPS.</string>
 </resources>

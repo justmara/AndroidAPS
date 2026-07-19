@@ -20,6 +20,16 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/nav_show_profile_changes"
+        android:title="@string/show_profile_changes"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/nav_hide_profile_changes"
+        android:title="@string/hide_profile_changes"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/nav_remove_started_events"
         android:title="@string/careportal_remove_started_events"
         app:showAsAction="never" />

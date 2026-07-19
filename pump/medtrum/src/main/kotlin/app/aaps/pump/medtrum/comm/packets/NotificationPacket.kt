@@ -268,7 +268,7 @@ class NotificationPacket(val injector: HasAndroidInjector) {
 
     private fun handleBasal(data: ByteArray, offset: Int): Int {
         aapsLogger.debug(LTag.PUMPCOMM, "Basal notification received")
-        val basalType = enumValues<BasalType>()[data.copyOfRange(offset, offset + 1).toInt()]
+        val basalType = enumValues<BasalType>().getOrNull(data.copyOfRange(offset, offset + 1).toInt()) ?: BasalType.NONE
         val basalSequence = data.copyOfRange(offset + 1, offset + 3).toInt()
         val basalPatchId = data.copyOfRange(offset + 3, offset + 5).toLong()
         val basalStartTime = medtrumTimeUtil.convertPumpTimeToSystemTimeMillis(data.copyOfRange(offset + 5, offset + 9).toLong())

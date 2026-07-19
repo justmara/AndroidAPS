@@ -206,6 +206,12 @@
     <attr name="iobPredASColor" format="reference|color" />
     <attr name="bgiColor" format="reference|color" />
     <attr name="ratioColor" format="reference|color" />
+    <attr name="acceIsfColor" format="reference|color" />
+    <attr name="bgIsfColor" format="reference|color" />
+    <attr name="ppIsfColor" format="reference|color" />
+    <attr name="duraIsfColor" format="reference|color" />
+    <attr name="finalIsfColor" format="reference|color" />
+    <attr name="iobThColor" format="reference|color" />
     <attr name="activityColor" format="reference|color" />
     <attr name="baseBasalColor" format="reference|color" />
     <attr name="dotLineColor" format="reference|color" />

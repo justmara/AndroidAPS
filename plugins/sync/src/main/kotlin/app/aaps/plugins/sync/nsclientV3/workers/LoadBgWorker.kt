@@ -84,7 +84,7 @@ class LoadBgWorker(
                 }
             }
         } catch (error: Exception) {
-            aapsLogger.error("Error: ", error)
+            aapsLogger.error(LTag.NSCLIENT, "Error: ", error)
             rxBus.send(EventNSClientNewLog("◄ ERROR", error.localizedMessage))
             nsClientV3Plugin.lastOperationError = error.localizedMessage
             return Result.failure(workDataOf("Error" to error.localizedMessage))

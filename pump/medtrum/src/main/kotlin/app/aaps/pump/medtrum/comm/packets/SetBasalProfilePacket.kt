@@ -42,7 +42,7 @@ class SetBasalProfilePacket(injector: HasAndroidInjector, private val basalProfi
     override fun handleResponse(data: ByteArray): Boolean {
         val success = super.handleResponse(data)
         if (success) {
-            val basalType = enumValues<BasalType>()[data.copyOfRange(RESP_BASAL_TYPE_START, RESP_BASAL_TYPE_END).toInt()]
+            val basalType = enumValues<BasalType>().getOrNull(data.copyOfRange(RESP_BASAL_TYPE_START, RESP_BASAL_TYPE_END).toInt()) ?: BasalType.NONE
             val basalValue = data.copyOfRange(RESP_BASAL_VALUE_START, RESP_BASAL_VALUE_END).toInt() * 0.05
             val basalSequence = data.copyOfRange(RESP_BASAL_SEQUENCE_START, RESP_BASAL_SEQUENCE_END).toInt()
             val basalPatchId = data.copyOfRange(RESP_BASAL_PATCH_ID_START, RESP_BASAL_PATCH_ID_END).toLong()

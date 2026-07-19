@@ -82,8 +82,13 @@ class Widget : AppWidgetProvider() {
         private var handler = Handler(HandlerThread(this::class.simpleName + "Handler").also { it.start() }.looper)
 
         fun updateWidget(context: Context, from: String) {
+            val ids = AppWidgetManager.getInstance(context)?.getAppWidgetIds(ComponentName(context, Widget::class.java))
+            // Nothing placed on the home screen -> skip the broadcast (which would otherwise
+            // trigger dependency injection + logging every minute for no visible effect).
+            if (ids == null || ids.isEmpty()) return
             context.sendBroadcast(Intent().also {
-                it.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, AppWidgetManager.getInstance(context)?.getAppWidgetIds(ComponentName(context, Widget::class.java)))
+                it.component = ComponentName(context, Widget::class.java)
+                it.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
                 it.putExtra("from", from)
                 it.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
             })

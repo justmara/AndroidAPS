@@ -18,6 +18,12 @@ class DetermineBasalResultSMBFromJS private constructor(injector: HasAndroidInje
     private var eventualBG = 0.0
     private var snoozeBG = 0.0
     override var variableSens: Double? = null
+    override var acceIsf: Double? = null
+    override var bgIsf: Double? = null
+    override var ppIsf: Double? = null
+    override var duraIsf: Double? = null
+    override var finalIsf: Double? = null
+    override var iobThreshold: Double? = null
 
     internal constructor(injector: HasAndroidInjector, result: JSONObject) : this(injector) {
         date = dateUtil.now()

@@ -85,7 +85,7 @@ class ActivatePacket(injector: HasAndroidInjector, private val basalProfile: Byt
         if (success) {
             val patchId = data.copyOfRange(RESP_PATCH_ID_START, RESP_PATCH_ID_END).toLong()
             val time = medtrumTimeUtil.convertPumpTimeToSystemTimeMillis(data.copyOfRange(RESP_TIME_START, RESP_TIME_END).toLong())
-            val basalType = enumValues<BasalType>()[data.copyOfRange(RESP_BASAL_TYPE_START, RESP_BASAL_TYPE_END).toInt()]
+            val basalType = enumValues<BasalType>().getOrNull(data.copyOfRange(RESP_BASAL_TYPE_START, RESP_BASAL_TYPE_END).toInt()) ?: BasalType.NONE
             val basalValue = data.copyOfRange(RESP_BASAL_VALUE_START, RESP_BASAL_VALUE_END).toInt() * 0.05
             val basalSequence = data.copyOfRange(RESP_BASAL_SEQUENCE_START, RESP_BASAL_SEQUENCE_END).toInt()
             val basalPatchId = data.copyOfRange(RESP_BASAL_PATCH_ID_START, RESP_BASAL_PATCH_ID_END).toLong()

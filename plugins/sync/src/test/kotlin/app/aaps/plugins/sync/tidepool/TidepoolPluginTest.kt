@@ -48,9 +48,12 @@ class TidepoolPluginTest : TestBaseWithProfile() {
     }
 
     @Test
-    fun notLoggedInStateTriggersLoginWhenConnectivityRestored() {
+    fun blockedStateRecoversWhenConnectivityRestored() {
         whenever(authFlowOut.authState).thenReturn(authState)
         whenever(receiverDelegate.allowed).thenReturn(true)
+        // The BLOCKED auth-state was removed (connectivity is now checked separately in doUpload), so
+        // "recovery on connectivity restore" means: connectivity is allowed again while auth still needs
+        // a (re)login -> doUpload routes to doLogin, which sets FETCHING_TOKEN/"Connecting".
         whenever(authFlowOut.connectionStatus).thenReturn(AuthFlowOut.ConnectionStatus.NOT_LOGGED_IN)
 
         val realUploader = TidepoolUploader(aapsLogger, rxBus, context, preferences, uploadChunk,
@@ -66,10 +69,10 @@ class TidepoolPluginTest : TestBaseWithProfile() {
     }
 
     @Test
-    fun uploadSkippedWhenConnectivityNotAllowed() {
+    fun blockedStateStaysBlockedWhenNotAllowed() {
         whenever(authFlowOut.authState).thenReturn(authState)
         whenever(receiverDelegate.allowed).thenReturn(false)
-        whenever(authFlowOut.connectionStatus).thenReturn(AuthFlowOut.ConnectionStatus.NOT_LOGGED_IN)
+        whenever(authFlowOut.connectionStatus).thenReturn(AuthFlowOut.ConnectionStatus.BLOCKED)
 
         val realUploader = TidepoolUploader(aapsLogger, rxBus, context, preferences, uploadChunk,
                                             dateUtil, receiverDelegate, config, l, authFlowOut)
@@ -79,7 +82,6 @@ class TidepoolPluginTest : TestBaseWithProfile() {
         plugin.onStart()
         rxBus.send(EventConnectivityOptionChanged("Blocked", false))
 
-        // When connectivity is not allowed, doUpload should return early without attempting login
         verify(authFlowOut, never()).updateConnectionStatus(eq(AuthFlowOut.ConnectionStatus.FETCHING_TOKEN), any())
         plugin.onStop()
     }

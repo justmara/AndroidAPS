@@ -19,8 +19,8 @@
     <string name="startingbolus">Начало подачи болюса</string>
     <string name="waitingforestimatedbolusend">Ожидание завершения болюса</string>
     <string name="gettingbolusstatus">Получение статуса болюса</string>
-    <string name="stoppingtempbasal">Остановка врем базала</string>
-    <string name="settingtempbasal">Установка врем базала</string>
+    <string name="stoppingtempbasal">Остановка TBR</string>
+    <string name="settingtempbasal">Установка TBR</string>
     <string name="settingextendedbolus">Установка пролонгированного болюса</string>
     <string name="stoppingextendedbolus">Остановка пролонгированного болюса</string>
     <string name="updatingbasalrates">Обновление значений базала</string>
@@ -125,7 +125,7 @@
     <string name="diaconn_g8_errorcode_15">По завершении настройки базала возможна подача базального инсулина.</string>
     <string name="diaconn_g8_logtubechange_title">Внести запись о замене катетера</string>
     <string name="diaconn_g8_logtubechange_summary">Добавить событие \"Замена катетера\" в портал терапии при обнаружении в журнале</string>
-    <string name="diaconn_g8_logtempstart">Начало подачи врем базала</string>
+    <string name="diaconn_g8_logtempstart">Начало подачи TBR</string>
     <string name="diaconn_g8_errorcode_32">Во время приостановки на низких подача инсулина невозможна</string>
     <string name="diaconn_g8_errorcode_33">Работает Приостановка на низких, команда ВКЛ отклонена.</string>
     <string name="diaconn_g8_errorcode_34">Приостановка на низких отключена, команда ВЫКЛ отклонена.</string>

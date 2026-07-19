@@ -297,6 +297,8 @@ class NSClientV3Plugin @Inject constructor(
             .subscribe({ executeUpload("EventProfileStoreChanged", forceNew = false) }, fabricPrivacy::logException)
 
         runLoop = Runnable {
+            // Re-arm the service wake lock so it auto-releases if this heartbeat ever stops.
+            nsClientV3Service?.refreshWakeLock()
             var refreshInterval = T.mins(5).msecs()
             if (nsClientSource.isEnabled())
                 persistenceLayer.getLastGlucoseValue()?.let {
@@ -898,6 +900,7 @@ class NSClientV3Plugin @Inject constructor(
                     )
                 )
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.NsClientSlowSync, title = R.string.ns_sync_slow))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.NsClient3IgnoreErrors, title = R.string.ns_ignore_errors))
             })
         }
     }

@@ -5,6 +5,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.data.model.TE
 import app.aaps.core.data.time.T
 import app.aaps.core.graph.data.BolusDataPoint
 import app.aaps.core.graph.data.CarbsDataPoint
@@ -26,6 +27,7 @@ import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.Round
 import app.aaps.core.interfaces.utils.Translator
 import app.aaps.core.interfaces.workflow.CalculationWorkflow
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.workflow.LoggingWorker
 import app.aaps.core.utils.receivers.DataWorkerStorage
@@ -51,6 +53,12 @@ class PrepareTreatmentsDataWorker(
         val overviewData: OverviewData
     )
 
+    companion object {
+        /** MetricsSampler tags phone step-counter rows "<Manufacturer> <Model> sensor"; this suffix
+         *  isolates them from worn / Health-Connect rows for the "Phone steps only" graph filter. */
+        private const val PHONE_SENSOR_DEVICE_SUFFIX = " sensor"
+    }
+
     override suspend fun doWorkAndLog(): Result {
 
         val data = dataWorkerStorage.pickupObject(inputData.getLong(DataWorkerStorage.STORE_KEY, -1)) as PrepareTreatmentsData?
@@ -61,9 +69,11 @@ class PrepareTreatmentsDataWorker(
         rxBus.send(EventIobCalculationProgress(CalculationWorkflow.ProgressData.PREPARE_TREATMENTS_DATA, 0, null))
         data.overviewData.maxTreatmentsValue = 0.0
         data.overviewData.maxTherapyEventValue = 0.0
+        data.overviewData.maxProfileChangeValue = 0.0
         data.overviewData.maxEpsValue = 0.0
         val filteredTreatments: MutableList<DataPointWithLabelInterface> = ArrayList()
         val filteredTherapyEvents: MutableList<DataPointWithLabelInterface> = ArrayList()
+        val filteredProfileChangeEvents: MutableList<DataPointWithLabelInterface> = ArrayList()
         val filteredEps: MutableList<DataPointWithLabelInterface> = ArrayList()
 
         persistenceLayer.getBolusesFromTimeToTime(fromTime, endTime, true)
@@ -99,13 +109,23 @@ class PrepareTreatmentsDataWorker(
                 }
         }
 
-        // Careportal
-        persistenceLayer.getTherapyEventDataFromToTime(fromTime - T.hours(6).msecs(), endTime).blockingGet()
+        // Careportal — AAPS profile-edit notes go to their own series, gated by a separate
+        // graph toggle, so they don't appear under the regular "Treatments" therapy events.
+        val (profileChangeTEs, normalTEs) = persistenceLayer.getTherapyEventDataFromToTime(fromTime - T.hours(6).msecs(), endTime).blockingGet()
+            .partition { it.type == TE.Type.NOTE && it.enteredBy == TE.ENTERED_BY_PROFILE_EDIT }
+        normalTEs
             .map { TherapyEventDataPoint(it, rh, profileUtil, translator) }
             .filterTimeframe(fromTime, endTime)
             .forEach {
                 if (it.y == 0.0) it.y = getNearestBg(data.overviewData, it.x.toLong())
                 filteredTherapyEvents.add(it)
+            }
+        profileChangeTEs
+            .map { TherapyEventDataPoint(it, rh, profileUtil, translator) }
+            .filterTimeframe(fromTime, endTime)
+            .forEach {
+                if (it.y == 0.0) it.y = getNearestBg(data.overviewData, it.x.toLong())
+                filteredProfileChangeEvents.add(it)
             }
 
         // increase maxY if a treatment forces it's own height that's higher than a BG value
@@ -115,9 +135,13 @@ class PrepareTreatmentsDataWorker(
         filteredTherapyEvents.maxOfOrNull { it.y }
             ?.let(::addUpperChartMargin)
             ?.let { data.overviewData.maxTherapyEventValue = maxOf(data.overviewData.maxTherapyEventValue, it) }
+        filteredProfileChangeEvents.maxOfOrNull { it.y }
+            ?.let(::addUpperChartMargin)
+            ?.let { data.overviewData.maxProfileChangeValue = maxOf(data.overviewData.maxProfileChangeValue, it) }
 
         data.overviewData.treatmentsSeries = PointsWithLabelGraphSeries(filteredTreatments.toTypedArray())
         data.overviewData.therapyEventSeries = PointsWithLabelGraphSeries(filteredTherapyEvents.toTypedArray())
+        data.overviewData.profileChangeEventSeries = PointsWithLabelGraphSeries(filteredProfileChangeEvents.toTypedArray())
         data.overviewData.epsSeries = PointsWithLabelGraphSeries(filteredEps.toTypedArray())
 
         data.overviewData.heartRateGraphSeries = PointsWithLabelGraphSeries<DataPointWithLabelInterface>(
@@ -125,9 +149,14 @@ class PrepareTreatmentsDataWorker(
                 .map { hr -> HeartRateDataPoint(hr, rh) }
                 .toTypedArray()).apply { color = rh.gac(null, app.aaps.core.ui.R.attr.heartRateColor) }
 
+        // "Phone steps only": keep only the phone-sensor sampler rows so the graph shows exactly the source
+        // the loop now reads — dropping worn / Health-Connect rows (and AutoISF's separate "Smartphone"
+        // display rows, which would otherwise double-plot on top of the sampler's " sensor" points).
+        val phoneStepsOnly = preferences.get(BooleanKey.OverviewAlwaysUsePhoneSteps)
         data.overviewData.stepsCountGraphSeries = PointsWithLabelGraphSeries<DataPointWithLabelInterface>(
             persistenceLayer.getStepsCountFromTimeToTime(fromTime, endTime)
-                .map { steps -> StepsDataPoint(steps, rh) }
+                .filter { !phoneStepsOnly || it.device.endsWith(PHONE_SENSOR_DEVICE_SUFFIX) }
+                .map { steps -> StepsDataPoint(steps, rh, data.overviewData.stepsForScale) }
                 .toTypedArray()).apply { color = rh.gac(null, app.aaps.core.ui.R.attr.stepsColor) }
 
 

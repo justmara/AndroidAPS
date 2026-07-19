@@ -99,7 +99,7 @@ class FabricPrivacyImpl @Inject constructor(
     }
 
     override fun fabricEnabled(): Boolean {
-        return sharedPreferences.getBoolean(BooleanKey.MaintenanceEnableFabric.key, true)
+        return sharedPreferences.getBoolean(BooleanKey.MaintenanceEnableFabric.key, false)
     }
 
     override fun logWearException(wearException: EventData.WearException) {

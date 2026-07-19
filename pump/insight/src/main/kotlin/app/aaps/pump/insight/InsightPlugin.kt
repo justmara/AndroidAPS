@@ -189,7 +189,7 @@ class InsightPlugin @Inject constructor(
     }
     private var timeOffset: Long = 0
     private var bolusID = 0
-    private var bolusCancelled = false
+    @Volatile private var bolusCancelled = false
     private var activeBasalProfile: BasalProfile? = null
     private var profileBlocks: List<BasalProfileBlock>? = null
     private var limitsFetched = false

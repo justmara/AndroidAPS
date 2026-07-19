@@ -1,0 +1,697 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/boost_widget_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@color/black"
+    android:padding="4dp"
+    android:gravity="center_vertical">
+
+    <!-- LEFT: BG Bobble + time ago + tier -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="2"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="2dp">
+
+        <TextView
+            android:id="@+id/pump_battery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="🔋 --%"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="9sp"
+            android:autoSizeMaxTextSize="14sp"
+            android:maxLines="1"
+            tools:ignore="HardcodedText" />
+
+        <ImageView
+            android:id="@+id/bg_bobble"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="3"
+            android:contentDescription="@string/trend_arrow"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true" />
+
+        <TextView
+            android:id="@+id/time_ago"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="--m"
+            android:textColor="@color/white"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="10sp"
+            android:autoSizeMaxTextSize="14sp"
+            android:maxLines="1"
+            tools:ignore="HardcodedText" />
+
+        <TextView
+            android:id="@+id/tier_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="Tier"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeMaxTextSize="18sp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            tools:ignore="HardcodedText" />
+
+        <!-- Spacer: absorbs the leftover height at the bottom so the
+             time-ago + tier/ISF block sits just below the bobble, not at the very bottom.
+             Uses an (empty) TextView because RemoteViews does not support a bare View. -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+    </LinearLayout>
+
+    <!-- RIGHT (standard): 2-column x 3-row data table -->
+    <LinearLayout
+        android:id="@+id/right_panel_standard"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="3"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="2dp">
+
+        <!-- Row 1: IOB | TBR | COB -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_iob"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="IOB"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/iob"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.8"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_tbr"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="TBR"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/tbr"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="11sp"
+                    android:autoSizeMaxTextSize="22sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_cob"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="COB"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/cob"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Row 2: Profile | Target -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_profile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Profile"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/profile_pct"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="100%"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_target"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Target"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/temp_target"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Row 3: DynISF | Activity -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_dynisf"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="DynISF/CR"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/dynisf"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="15sp"
+                    android:maxLines="2"
+                    tools:text="ISF 3.4\nCR 10.0"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_activity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Activity"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/activity_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- RIGHT (AutoISF): IOB|TBR|COB / Profile|Target / Deltas+accel|ISF-factors -->
+    <LinearLayout
+        android:id="@+id/right_panel_autoisf"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="3"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="2dp"
+        android:visibility="gone">
+
+        <!-- Row 1: IOB | TBR | COB -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_iob"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="IOB"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_iob"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.8"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_tbr"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="TBR"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_tbr"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="11sp"
+                    android:autoSizeMaxTextSize="22sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_cob"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="COB"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_cob"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Row 2: Profile | Target -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_profile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Profile"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_profile"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="100%"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_target"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Target"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_target"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="24sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Row 3: Deltas | Factors/Autosens. The right label is set per algorithm in updateAutoIsf(). -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.4"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_deltas"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Deltas"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_deltas"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:lineSpacingMultiplier="0.95"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="7sp"
+                    android:autoSizeMaxTextSize="12sp"
+                    android:maxLines="4"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/label_ai_factors"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Factors"
+                    android:textColor="#AAAAAA"
+                    android:gravity="center"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="13sp"
+                    android:maxLines="1"
+                    tools:ignore="HardcodedText" />
+
+                <TextView
+                    android:id="@+id/ai_isf_factors"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="--"
+                    android:textColor="@color/white"
+                    android:lineSpacingMultiplier="0.95"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="7sp"
+                    android:autoSizeMaxTextSize="12sp"
+                    android:maxLines="5"
+                    tools:ignore="HardcodedText" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

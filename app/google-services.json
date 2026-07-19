@@ -1,34 +1,33 @@
 {
   "project_info": {
-    "project_number": "477603612366",
-    "firebase_url": "https://androidaps-c34f8.firebaseio.com",
-    "project_id": "androidaps-c34f8",
-    "storage_bucket": "androidaps-c34f8.appspot.com"
+    "project_number": "968630704208",
+    "project_id": "customaaps",
+    "storage_bucket": "customaaps.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:477603612366:android:56b8fa16651fb8dbfcb29f",
+        "mobilesdk_app_id": "1:968630704208:android:f26a610e3f6cf214409955",
         "android_client_info": {
           "package_name": "info.nightscout.aapsclient"
         }
       },
       "oauth_client": [
         {
-          "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+          "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyD9HRtJJsnk_SbAMAuvudSua2vEm3j3430"
+          "current_key": "AIzaSyBNDfZD7Du3dEcfNWnAvtue4-1Xv2L9i7Q"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+              "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
@@ -37,27 +36,27 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:477603612366:android:8e749a9253635bcafcb29f",
+        "mobilesdk_app_id": "1:968630704208:android:14dc844d1cfeb921409955",
         "android_client_info": {
           "package_name": "info.nightscout.aapsclient2"
         }
       },
       "oauth_client": [
         {
-          "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+          "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyD9HRtJJsnk_SbAMAuvudSua2vEm3j3430"
+          "current_key": "AIzaSyBNDfZD7Du3dEcfNWnAvtue4-1Xv2L9i7Q"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+              "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
@@ -66,27 +65,27 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:477603612366:android:aef229914e3e5448",
+        "mobilesdk_app_id": "1:968630704208:android:7cc174fb400fe306409955",
         "android_client_info": {
           "package_name": "info.nightscout.aapspumpcontrol"
         }
       },
       "oauth_client": [
         {
-          "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+          "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyD9HRtJJsnk_SbAMAuvudSua2vEm3j3430"
+          "current_key": "AIzaSyBNDfZD7Du3dEcfNWnAvtue4-1Xv2L9i7Q"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+              "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
@@ -95,85 +94,27 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:477603612366:android:efc956f55b281623",
+        "mobilesdk_app_id": "1:968630704208:android:b8ef2029066ae278409955",
         "android_client_info": {
           "package_name": "info.nightscout.androidaps"
         }
       },
       "oauth_client": [
         {
-          "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+          "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyD9HRtJJsnk_SbAMAuvudSua2vEm3j3430"
+          "current_key": "AIzaSyBNDfZD7Du3dEcfNWnAvtue4-1Xv2L9i7Q"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:477603612366:android:b38d6e7351f73cc0",
-        "android_client_info": {
-          "package_name": "info.nightscout.nsclient"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyD9HRtJJsnk_SbAMAuvudSua2vEm3j3430"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:477603612366:android:2dc8cf3acd3332e7",
-        "android_client_info": {
-          "package_name": "info.nightscout.nsclient2"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyD9HRtJJsnk_SbAMAuvudSua2vEm3j3430"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "477603612366-a925drvlvs7qn7gt73r585erbqto8c79.apps.googleusercontent.com",
+              "client_id": "968630704208-bqp93ur1akpdlo9c3668ab5trsnd0ce2.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

@@ -41,7 +41,7 @@ class SingleFragmentActivity : DaggerAppCompatActivityWithResult() {
             ).commit()
         }
 
-        overview.setVersionView(findViewById<TextView>(R.id.version))
+        findViewById<TextView>(R.id.version)?.let { overview.setVersionView(it) }
         // Add menu items without overriding methods in the Activity
         singleFragmentMenuProvider = object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {

@@ -181,7 +181,10 @@ class EncryptedPrefsFormat @Inject constructor(
                         if (security.has("salt") && security.has("content_hash")) {
 
                             val salt = security.getString("salt").hexStringToByteArray()
-                            val decrypted = cryptoUtil.decrypt(masterPassword!!, salt, container.getString("content"))
+                            // masterPassword is nullable on the interface; a null here (malformed call)
+                            // must not NPE. An empty password fails to decrypt, falling through to the
+                            // existing wrong-password branch below.
+                            val decrypted = cryptoUtil.decrypt(masterPassword ?: "", salt, container.getString("content"))
 
                             if (decrypted != null) {
                                 try {

@@ -1,5 +1,6 @@
 package app.aaps.core.interfaces.aps
 
+import android.text.Spanned
 import app.aaps.core.interfaces.configuration.ConfigExportImport
 import app.aaps.core.interfaces.profile.Profile
 
@@ -37,6 +38,13 @@ interface APS : ConfigExportImport {
      * @return string or null if nothing to show
      */
     fun getSensitivityOverviewString(): String? = null
+
+    /**
+     * Render the last APS run "Result" block (Script debug + Result + Request) exactly as shown
+     * on the APS tab, for display in an overview popup.
+     * @return formatted text or null if not available / not implemented
+     */
+    fun lastResultBlockSpanned(): Spanned? = null
 
     /**
      * Calculate current ISF

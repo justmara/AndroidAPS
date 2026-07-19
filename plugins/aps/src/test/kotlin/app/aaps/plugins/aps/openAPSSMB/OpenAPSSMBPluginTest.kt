@@ -7,6 +7,7 @@ import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.plugins.aps.dynamiccr.DynamicCarbRatioCalculator
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -27,9 +28,10 @@ class OpenAPSSMBPluginTest : TestBaseWithProfile() {
 
     @BeforeEach fun prepare() {
         openAPSSMBPlugin = OpenAPSSMBPlugin(
-            aapsLogger, rxBus, constraintChecker, rh, profileFunction, profileUtil, config, activePlugin,
+            injector, aapsLogger, rxBus, constraintChecker, rh, profileFunction, profileUtil, config, activePlugin,
             iobCobCalculator, hardLimits, preferences, dateUtil, processedTbrEbData, persistenceLayer, glucoseStatusProvider,
-            tddCalculator, bgQualityCheck, uiInteraction, determineBasalSMB, profiler, GlucoseStatusCalculatorSMB(aapsLogger, iobCobCalculator, dateUtil, decimalFormatter, deltaCalculator), apsResultProvider
+            tddCalculator, bgQualityCheck, uiInteraction, determineBasalSMB, profiler, GlucoseStatusCalculatorSMB(aapsLogger, iobCobCalculator, dateUtil, decimalFormatter, deltaCalculator), apsResultProvider,
+            DynamicCarbRatioCalculator()
         )
     }
 

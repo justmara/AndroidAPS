@@ -1,0 +1,485 @@
+package app.aaps.plugins.main.general.overview.boost
+
+import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.aps.RT
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.iob.GlucoseStatusProvider
+import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
+import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.stats.TddCalculator
+import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.data.model.TE
+import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Extracts Boost-specific algorithm data from the last APS run result.
+ * Parses APSResult JSON for decision tier, DynISF, TDD, activity mode.
+ *
+ * Uses a time-based cache (30s expiry) to avoid repeated heavy DB queries
+ * (TDD calculations, therapy record lookups) on every UI event.
+ */
+@Singleton
+class BoostOverviewHelper @Inject constructor(
+    private val loop: Loop,
+    private val processedDeviceStatusData: ProcessedDeviceStatusData,
+    private val iobCobCalculator: IobCobCalculator,
+    private val tddCalculator: TddCalculator,
+    private val persistenceLayer: PersistenceLayer,
+    private val glucoseStatusProvider: GlucoseStatusProvider,
+    private val profileFunction: ProfileFunction,
+    private val config: Config,
+    private val dateUtil: DateUtil
+) {
+
+    // Cache to avoid recalculating TDD and querying DB on every UI event
+    @Volatile private var cachedStatus: BoostStatus? = null
+    @Volatile private var cachedAt: Long = 0L
+
+    data class BoostStatus(
+        val tier: BoostTier = BoostTier.INACTIVE,
+        val tierLabel: String = "Inactive",
+        val tierReason: String = "",
+        val dynIsfValue: Double = 0.0,
+        val tdd7d: Double = 0.0,
+        val tdd24h: Double = 0.0,
+        val tddWeighted: Double = 0.0,
+        val tddFromDebug: Double = 0.0,
+        val insulinDivisor: Int = 0,
+        val lastBg: Double = 0.0,
+        val activityMode: ActivityMode = ActivityMode.NORMAL,
+        val activityDetail: String = "Normal",
+        val targetBgMgdl: Double = 0.0,
+        val autosensRatio: Double = 1.0,
+        val profilePercentage: Int = 100,
+        val deltaAccl: Double = 0.0,
+        val variableSens: Double = 0.0,
+        val scriptDebugText: String = "",
+        val cannulaAgeDays: Double = -1.0,
+        val sensorAgeDays: Double = -1.0,
+        val fastCarbProtection: Boolean = false,
+        // --- AutoISF overview/widget data (raw mg/dL where applicable; UI converts to display units) ---
+        val deltaMgdl: Double = 0.0,           // current delta
+        val shortAvgDeltaMgdl: Double = 0.0,   // 15-min avg delta
+        val longAvgDeltaMgdl: Double = 0.0,    // 40-min avg delta
+        val bgAcceleration: Double = 0.0,      // "a:" value
+        val isfProfileMgdl: Double = 0.0,      // profile ISF
+        val carbRatioProfile: Double = 0.0,    // profile carb ratio (g/U)
+        val carbRatioEffective: Double = 0.0,  // effective CR used (Dynamic CR); equals profile CR when Dynamic CR is off
+        val dynamicCrActive: Boolean = false,  // true only when Dynamic CR / AutoCR was engaged this cycle (else show "---")
+        val acceIsf: Double = 1.0,             // AutoISF acceleration factor
+        val bgIsf: Double = 1.0,               // AutoISF BG-level factor
+        val ppIsf: Double = 1.0,               // AutoISF post-prandial factor
+        val duraIsf: Double = 1.0,             // AutoISF plateau/duration factor
+        val finalIsf: Double = 1.0,            // AutoISF combined factor applied
+        // Deviation-based sensitivity adjustment (Boost V5/V6)
+        val deviationSensRatio: Double? = null,
+        val deviationSensSource: String = "none",
+        val deviationSensClean: Int = 0,
+        val deviationSensTotal: Int = 0,
+        val sensNormalTarget: Double = 0.0,
+        // ── Boost V5 state-machine telemetry (populated only when V5 is the active APS) ──
+        val isV5Active: Boolean = false,
+        val v5State: BoostV5State = BoostV5State.IDLE,
+        val v5Age: Int = 0,
+        val v5Score: Double = 0.0,
+        val v5ActionMult: Double = 1.0,
+        val v5Budget: Double = 0.0,
+        val v5FinalDose: Double = 0.0,
+        val v5Brakes: List<BoostV5Brake> = emptyList(),
+        val v5GateRaw: String = "",
+    )
+
+    /**
+     * V5 meal-hypothesis state machine. Replaces the tier model for the V5 engine.
+     * `verb` is the one-word action shown on the chip; `colorHex` the chip colour
+     * (grey idle → amber watching → orange-red acting → orange covering → teal easing).
+     * Signed off 2026-06-26.
+     */
+    enum class BoostV5State(val label: String, val verb: String, val short: String, val colorHex: Long) {
+        IDLE("Idle", "idle", "IDLE", 0xFF78909C),                 // blue-grey
+        OBSERVING("Observing", "watching", "OBSERVE", 0xFFFFC107),// amber
+        CONFIRMED("Confirmed", "acting", "CONFIRM", 0xFFFF6E40),  // orange-red
+        COMMITTED("Committed", "covering", "COMMIT", 0xFFFF9800), // orange
+        RECOVERING("Recovering", "easing", "RECOVER", 0xFF26C6DA);// teal
+
+        companion object {
+            fun fromName(text: String?): BoostV5State =
+                entries.firstOrNull { it.name.equals(text?.trim(), ignoreCase = true) } ?: IDLE
+        }
+    }
+
+    /** A single Phase-3 brake/gate that fired this cycle. `isHard` = binary disable (red ⛔). */
+    data class BoostV5Brake(val label: String, val factor: Double, val isHard: Boolean)
+
+    enum class BoostTier(val label: String, val colorHex: Long) {
+        BOOST_BOLUS("Boost Bolus", 0xFFE040FB),
+        HIGH_BOOST("High Boost", 0xFFFF5252),
+        PERCENT_SCALE("Percent Scale", 0xFFFF9800),
+        UAM_BOOST("UAM Boost", 0xFFFFC107),
+        ACCELERATION("Acceleration", 0xFFFFAB40),
+        ENHANCED_OREF1("Enhanced oref1", 0xFF42A5F5),
+        REGULAR_OREF1("Regular oref1", 0xFF66BB6A),
+        INACTIVE("Inactive", 0xFF78909C);
+
+        companion object {
+            fun fromLabel(text: String): BoostTier {
+                val t = text.lowercase()
+                return when {
+                    t.contains("boost bolus") && !t.contains("high")       -> BOOST_BOLUS
+                    t.contains("high boost")                               -> HIGH_BOOST
+                    t.contains("percent scale") || t.contains("pctscale") -> PERCENT_SCALE
+                    t.contains("uam boost")                                -> UAM_BOOST
+                    t.contains("acceleration bolus") || t.contains("acceleration") -> ACCELERATION
+                    t.contains("enhanced oref1")                           -> ENHANCED_OREF1
+                    t.contains("regular oref1") || t.contains("oref1 smb") -> REGULAR_OREF1
+                    t.contains("outside boost") || t.contains("sleep-in") -> INACTIVE
+                    else                                                   -> REGULAR_OREF1
+                }
+            }
+        }
+    }
+
+    enum class ActivityMode(val label: String) {
+        NORMAL("Normal"),
+        ACTIVE("Active"),
+        INACTIVE("Inactive"),
+        SLEEP_IN("Sleep-in"),
+        BOOST_OFF("Boost off")
+    }
+
+    /**
+     * Returns cached status if less than CACHE_TTL_MS old, otherwise recalculates.
+     * Call invalidate() when you know the underlying data has changed (e.g. new loop run).
+     */
+    fun getBoostStatus(): BoostStatus {
+        val now = System.currentTimeMillis()
+        cachedStatus?.let { cached ->
+            if (now - cachedAt < CACHE_TTL_MS) return cached
+        }
+        val status = computeBoostStatus()
+        cachedStatus = status
+        cachedAt = now
+        return status
+    }
+
+    /** Force next getBoostStatus() call to recalculate. */
+    fun invalidate() {
+        cachedAt = 0L
+    }
+
+    private fun computeBoostStatus(): BoostStatus {
+        val request = loop.lastRun?.request
+        // The live RT is held inside the APSResult wrapper (DetermineBasalResult.rawData()); the
+        // APSResult itself is NOT an RT. Pull rawData() first; AAPSClient fallback = the RT received
+        // from Nightscout via ProcessedDeviceStatusData (NS-synced suggested RT).
+        val rt: RT? = (request?.rawData() as? RT) ?: (request as? RT) ?: processedDeviceStatusData.openAPSData.suggested
+        val json = try { request?.json() } catch (_: Exception) { null }
+        val reason = request?.reason ?: rt?.reason?.toString() ?: ""
+        // The Boost tier/activity text is written to consoleError (= scriptDebug),
+        // not consoleLog. On AAPSClient the RT is rebuilt from Nightscout, so read
+        // consoleError there; fall back to consoleLog only for completeness.
+        val scriptDebug = request?.scriptDebug ?: rt?.consoleError ?: rt?.consoleLog ?: emptyList()
+        val debugText = scriptDebug.joinToString("\n")
+        // Combine all text sources for parsing — scriptDebug, reason, and JSON reason field
+        val allText = "$debugText\n$reason"
+
+        // Decision tier: prefer the structured boostTier field (reliably uploaded to
+        // Nightscout) so it resolves on AAPSClient even when the verbose console output
+        // is absent. Fall back to parsing "TIER N: Label" from the console/reason text.
+        val tierResult = tierFromCode(rt?.boostTier)
+            ?: parseTierFromText(allText)
+            ?: Pair(BoostTier.REGULAR_OREF1, BoostTier.REGULAR_OREF1.label)
+        val tier = tierResult.first
+        val tierLabel = tierResult.second
+
+        val deltaAccl = json?.optDouble("delta_accl", 0.0) ?: rt?.deltaAcceleration ?: 0.0
+
+        // Parse activity/exercise mode from all text (e.g. "Inactive - 140% profile")
+        val activityResult = parseActivityFromText(allText)
+        val activityMode = activityResult.first
+        val activityDetail = activityResult.second
+
+        val profilePct = json?.optInt("current_profile_percentage", 0) ?: rt?.boostProfileSwitch ?: 0
+        // Parse profile % from scriptDebug header: "Boost V2 (...) | Profile: 140%"
+        val profileFromDebug = PROFILE_HEADER_REGEX.find(debugText)
+            ?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val effectiveProfilePct = when {
+            profilePct > 0    -> profilePct
+            profileFromDebug > 0 -> profileFromDebug
+            else              -> 100
+        }
+
+        val tdds7d = tddCalculator.calculate(7, allowMissingDays = true)
+        val avg7d = tddCalculator.averageTDD(tdds7d)
+        val tdd7d = avg7d?.data?.totalAmount ?: 0.0
+        val tdd24h = tddCalculator.calculateDaily(-24, 0)?.totalAmount ?: 0.0
+
+        val lastBg = iobCobCalculator.ads.actualBg()?.recalculated ?: 0.0
+
+        // Use actual DynISF values from the running APS algorithm, with NS RT fallback
+        val oapsProfile = request?.oapsProfile
+        val variableSens = request?.variableSens ?: rt?.variable_sens ?: 0.0
+        val apsTdd = oapsProfile?.TDD ?: rt?.tdd ?: 0.0
+        val apsInsulinDivisor = oapsProfile?.insulinDivisor ?: 0
+
+        // Use the algorithm's actual target
+        val targetBgMgdl = request?.targetBG ?: rt?.targetBG ?: 0.0
+
+        // Autosens ratio
+        val autosensRatio = request?.autosensResult?.ratio ?: rt?.sensitivityRatio ?: 1.0
+
+        // Fast-carb protection state
+        val fastCarbProtection = rt?.fastCarbProtection ?: false
+
+        // Try to parse TDD from scriptDebug (Boost may write "TDD: 48.3" or similar)
+        val tddFromDebug = parseTddFromText(allText)
+
+        // --- AutoISF overview data ---
+        val glucoseStatus = glucoseStatusProvider.glucoseStatusData
+        val profile = profileFunction.getProfile()
+        val isfProfileMgdl = profile?.getProfileIsfMgdl() ?: 0.0
+        // Carb ratio: profile baseline vs the effective CR the algorithm actually used (Dynamic CR).
+        // request/rt.carbRatio is the CR used for dosing this cycle; it equals the profile CR when Dynamic CR is off.
+        val carbRatioProfile = profile?.getIc() ?: 0.0
+        val carbRatioEffective = request?.carbRatio ?: rt?.carbRatio ?: carbRatioProfile
+        // Dynamic CR is "active" only when the algorithm actually applied a dynamic carb ratio this cycle:
+        // the raw value is > 0 only then, and 0 when the feature is off OR fell back to profile CR (e.g. no
+        // usable TDD). This mirrors how the dynamic-ISF line shows "---" unless a dynamic sens was applied.
+        // The raw value lives on the result's oaps profile (master); on AAPSClient (no oaps profile) infer it
+        // from the RT (a reason was written AND the used CR differs from the profile CR).
+        val rawDynamicCr = request?.oapsProfile?.dynamicCarbRatio
+            ?: request?.oapsProfileAutoIsf?.dynamicCarbRatio
+            ?: request?.oapsProfileBoost?.dynamicCarbRatio
+            ?: 0.0
+        val dynamicCrActive = rawDynamicCr > 0.0 ||
+            (request == null && rt?.carbRatioReason != null && carbRatioEffective != carbRatioProfile)
+
+        // ── Boost V5 state machine (active-only; D4 sign-off) ──
+        // The engine stamps rt.boostV5_active=true only when V5 is the selected/active doser (not
+        // shadow). This is R8-safe (a serialized flag, not a class name) and needs no plugin coupling.
+        val v5Active = rt?.boostV5_active == true
+        val v5State = BoostV5State.fromName(rt?.boostV5_state)
+        val v5Brakes = if (v5Active) parseGateReductions(rt?.boostV5_gateReduction) else emptyList()
+
+
+        return BoostStatus(
+            tier = tier, tierLabel = tierLabel, tierReason = reason,
+            dynIsfValue = variableSens,
+            tdd7d = tdd7d, tdd24h = tdd24h,
+            tddWeighted = apsTdd,
+            tddFromDebug = tddFromDebug,
+            insulinDivisor = apsInsulinDivisor,
+            lastBg = lastBg,
+            targetBgMgdl = targetBgMgdl,
+            autosensRatio = autosensRatio,
+            activityMode = activityMode, activityDetail = activityDetail,
+            profilePercentage = effectiveProfilePct,
+            deltaAccl = deltaAccl, variableSens = variableSens,
+            scriptDebugText = debugText,
+            cannulaAgeDays = getAgeDays(TE.Type.CANNULA_CHANGE),
+            sensorAgeDays = getAgeDays(TE.Type.SENSOR_CHANGE),
+            fastCarbProtection = fastCarbProtection,
+            deltaMgdl = glucoseStatus?.delta ?: 0.0,
+            shortAvgDeltaMgdl = glucoseStatus?.shortAvgDelta ?: 0.0,
+            longAvgDeltaMgdl = glucoseStatus?.longAvgDelta ?: 0.0,
+            bgAcceleration = glucoseStatus?.bgAcceleration ?: 0.0,
+            isfProfileMgdl = isfProfileMgdl,
+            carbRatioProfile = carbRatioProfile,
+            carbRatioEffective = carbRatioEffective,
+            dynamicCrActive = dynamicCrActive,
+            acceIsf = rt?.acceIsf ?: 1.0,
+            bgIsf = rt?.bgIsf ?: 1.0,
+            ppIsf = rt?.ppIsf ?: 1.0,
+            duraIsf = rt?.duraIsf ?: 1.0,
+            finalIsf = rt?.finalIsf ?: 1.0,
+            deviationSensRatio = rt?.deviationSensRatio,
+            deviationSensSource = rt?.deviationSensSource ?: "none",
+            deviationSensClean = rt?.deviationSensClean ?: 0,
+            deviationSensTotal = rt?.deviationSensTotal ?: 0,
+            sensNormalTarget = rt?.sensNormalTarget ?: 0.0,
+            isV5Active = v5Active,
+            v5State = v5State,
+            v5Age = rt?.boostV5_age ?: 0,
+            v5Score = rt?.boostV5_score ?: 0.0,
+            v5ActionMult = rt?.boostV5_actionMult ?: 1.0,
+            v5Budget = rt?.boostV5_budget ?: 0.0,
+            v5FinalDose = rt?.boostV5_finalDose ?: 0.0,
+            v5Brakes = v5Brakes,
+            v5GateRaw = rt?.boostV5_gateReduction ?: "",
+        )
+    }
+
+    /** Map the structured RT.boostTier code (uploaded to Nightscout) to (BoostTier, "Tier N - Label").
+     *  Returns null for "NONE"/null/unknown so the caller falls back to text parsing. */
+    private fun tierFromCode(code: String?): Pair<BoostTier, String>? = when (code?.uppercase()) {
+        "COB_PRIMARY"    -> Pair(BoostTier.BOOST_BOLUS, "Tier 1 - Primary COB handling")
+        "COB_SECONDARY"  -> Pair(BoostTier.BOOST_BOLUS, "Tier 2 - Secondary COB handling")
+        "UAM_BOOST"      -> Pair(BoostTier.UAM_BOOST, "Tier 3 - UAM Boost")
+        "UAM_HIGH_BOOST" -> Pair(BoostTier.HIGH_BOOST, "Tier 4 - UAM High Boost")
+        "PERCENT_SCALE"  -> Pair(BoostTier.PERCENT_SCALE, "Tier 5 - Percent Scale")
+        "ACCELERATION"   -> Pair(BoostTier.ACCELERATION, "Tier 6 - Acceleration Bolus")
+        "ENHANCED_OREF1" -> Pair(BoostTier.ENHANCED_OREF1, "Tier 7 - Enhanced oref1")
+        "REGULAR_OREF1"  -> Pair(BoostTier.REGULAR_OREF1, "Tier 8 - Regular oref1")
+        else             -> null
+    }
+
+    /** Parse "Tier N - Label" from combined text. Returns (BoostTier, display label) or null. */
+    private fun parseTierFromText(text: String): Pair<BoostTier, String>? {
+        val match = TIER_REGEX.find(text) ?: return null
+        val tierNum = match.groupValues[1]
+        val tierName = match.groupValues[2].trim()
+        // Trim at sentence boundary if reason has extra text after tier label
+        val cleanName = tierName.split(TIER_NAME_SPLIT_REGEX).firstOrNull()?.trim()
+            ?.trimEnd('<', '>', ' ') ?: tierName
+        val label = "Tier $tierNum - $cleanName"
+        val tier = BoostTier.fromLabel(cleanName)
+        return Pair(tier, label)
+    }
+
+    /** Parse activity/exercise mode from Boost scriptDebug.
+     *  Formats:
+     *    "✓ BOOST ACTIVE (INACTIVE)"  → Boost running, exercise=inactive, profile adjusted
+     *    "✓ BOOST ACTIVE (ACTIVE)"    → Boost running, exercise=active
+     *    "✗ BOOST INACTIVE: Outside boost time window" → Boost off
+     *    "✗ BOOST INACTIVE: Sleep-in (...)" → Sleep-in mode */
+    private fun parseActivityFromText(text: String): Pair<ActivityMode, String> {
+        // Case 1: "BOOST ACTIVE (INACTIVE)" or "BOOST ACTIVE (ACTIVE)" etc.
+        val activeMatch = BOOST_ACTIVE_REGEX.find(text)
+        if (activeMatch != null) {
+            val modeName = activeMatch.groupValues[1].trim()
+            // Extract profile percentage from "→ profile 140%"
+            val pct = PROFILE_PCT_REGEX.find(text)?.groupValues?.get(1) ?: ""
+            val mode = when (modeName.uppercase()) {
+                "INACTIVE"             -> ActivityMode.INACTIVE
+                "ACTIVE"               -> ActivityMode.ACTIVE
+                "SLEEP-IN", "SLEEP IN" -> ActivityMode.SLEEP_IN
+                else                   -> ActivityMode.NORMAL
+            }
+            val detail = if (pct.isNotEmpty()) "$modeName - $pct%" else modeName
+            return Pair(mode, detail)
+        }
+
+        // Case 2: "BOOST INACTIVE: Sleep-in (...)"
+        if (SLEEP_IN_REGEX.containsMatchIn(text)) {
+            return Pair(ActivityMode.SLEEP_IN, "Sleep-in")
+        }
+
+        // Case 3: "BOOST INACTIVE: Outside boost time window"
+        if (OUTSIDE_WINDOW_REGEX.containsMatchIn(text)) {
+            return Pair(ActivityMode.BOOST_OFF, "Outside window")
+        }
+
+        // Case 4: Any other "BOOST INACTIVE: <reason>"
+        val inactiveMatch = BOOST_INACTIVE_REGEX.find(text)
+        if (inactiveMatch != null) {
+            val reason = inactiveMatch.groupValues[1].trim().split("\n").first().trim()
+            // Drop a trailing numeric parenthetical such as "(144.0 > 100.80000030517578)" -
+            // it's the algorithm's internal mg/dL comparison (often an unrounded float) and
+            // only clutters the EXERCISE field, e.g. "High temp target (...)" -> "High temp target".
+            val clean = reason.replace(NUMERIC_PARENS_REGEX, "").trim()
+            return Pair(ActivityMode.BOOST_OFF, clean.ifEmpty { reason })
+        }
+
+        return Pair(ActivityMode.NORMAL, "Normal")
+    }
+
+    /** Parse TDD from Boost scriptDebug.
+     *  Priority: "Final TDD=31.5" > "Blended TDD=31.5" > "TDD: 31.5" */
+    private fun parseTddFromText(text: String): Double {
+        // Most specific: "Final TDD=31.5"
+        FINAL_TDD_REGEX.find(text)?.groupValues?.get(1)?.toDoubleOrNull()?.let { return it }
+
+        // Next: "Blended TDD=31.5"
+        BLENDED_TDD_REGEX.find(text)?.groupValues?.get(1)?.toDoubleOrNull()?.let { return it }
+
+        // Fallback: first "TDD: 31.5" (the algorithm's working TDD line)
+        TDD_COLON_REGEX.find(text)?.groupValues?.get(1)?.toDoubleOrNull()?.let { return it }
+
+        return 0.0
+    }
+
+    private fun getAgeDays(type: TE.Type): Double {
+        val event = persistenceLayer.getLastTherapyRecordUpToNow(type)
+        return if (event != null) (dateUtil.now() - event.timestamp) / (24.0 * 60 * 60 * 1000) else -1.0
+    }
+
+    companion object {
+        /** Cache TTL — getBoostStatus() returns cached result within this window */
+        private const val CACHE_TTL_MS = 30_000L  // 30 seconds
+
+        /**
+         * Parse `boostV5_gateReduction` into displayable brakes. Pure/static so it is unit-testable.
+         * Format is a comma-separated list of:
+         *   `HARD:<reason>`         → binary disable (isHard, factor 0)
+         *   `maxIOB` / `spike`      → a hard clamp (isHard, factor 0)
+         *   `<name>:<factor>`       → soft brake; only surfaced when it actually bit (factor < ~1.0)
+         *   `none`                  → ignored
+         * Returns [] for null/empty/"none". Hard gates first, then strongest soft brakes.
+         */
+        fun parseGateReductions(raw: String?): List<BoostV5Brake> {
+            val text = raw?.trim().orEmpty()
+            if (text.isEmpty() || text.equals("none", ignoreCase = true)) return emptyList()
+            val brakes = mutableListOf<BoostV5Brake>()
+            for (tokenRaw in text.split(',')) {
+                val token = tokenRaw.trim()
+                if (token.isEmpty() || token.equals("none", ignoreCase = true)) continue
+                when {
+                    token.startsWith("HARD:", ignoreCase = true) ->
+                        brakes += BoostV5Brake(token.substringAfter(':').trim(), 0.0, isHard = true)
+                    token.equals("maxIOB", ignoreCase = true) ->
+                        brakes += BoostV5Brake("maxIOB", 0.0, isHard = true)
+                    token.equals("spike", ignoreCase = true) ->
+                        brakes += BoostV5Brake("spike", 0.0, isHard = true)
+                    token.contains(':') -> {
+                        val name = token.substringBefore(':').trim()
+                        val factor = token.substringAfter(':').trim().toDoubleOrNull() ?: continue
+                        if (factor < 0.999) brakes += BoostV5Brake(name, factor, isHard = false)
+                    }
+                }
+            }
+            // Hard gates first; among soft brakes, the strongest (lowest factor) first.
+            return brakes.sortedWith(compareByDescending<BoostV5Brake> { it.isHard }.thenBy { it.factor })
+        }
+
+        /**
+         * Full Boost V6 decision breakdown text, built purely from [BoostStatus]. Shared by both
+         * the classic "Boost (modified)" overview and the dark V2 overview so the two never diverge.
+         */
+        fun formatV5Detail(bs: BoostStatus): String {
+            val sb = StringBuilder()
+            sb.append("State: ${bs.v5State.label} (${bs.v5State.verb}) · age ${bs.v5Age} cycle${if (bs.v5Age == 1) "" else "s"}")
+            sb.append("\n\nMeal score: ${String.format(Locale.getDefault(), "%.2f", bs.v5Score)}   (enter 0.44 · confirm 0.55)")
+            sb.append("\nAction multiplier: ×${String.format(Locale.getDefault(), "%.2f", bs.v5ActionMult)}")
+            sb.append("\nAggression budget: ${String.format(Locale.getDefault(), "%.2f", bs.v5Budget)}U")
+            sb.append("\nDose this cycle: ${String.format(Locale.getDefault(), "%.2f", bs.v5FinalDose)}U")
+            sb.append("\n\nBrakes:")
+            if (bs.v5Brakes.isEmpty()) sb.append("\n  none")
+            else bs.v5Brakes.forEach { b ->
+                if (b.isHard) sb.append("\n  ⛔ ${b.label} (hard disable)")
+                else sb.append("\n  ${b.label}: ×${String.format(Locale.getDefault(), "%.2f", b.factor)}")
+            }
+            sb.append("\n\nDelta accel: ${String.format(Locale.getDefault(), "%.1f", bs.deltaAccl)}%")
+            sb.append("\n\n--- Script Debug ---\n${bs.scriptDebugText.ifEmpty { "(no debug output)" }}")
+            return sb.toString()
+        }
+
+        // Pre-compiled regexes (avoid recompilation on every getBoostStatus() call)
+        private val TIER_REGEX = Regex("""tier\s+(\d+)\s*[-:]\s*(.+)""", RegexOption.IGNORE_CASE)
+        private val BOOST_ACTIVE_REGEX = Regex("""BOOST\s+ACTIVE\s*\((\w[\w\s-]*)\)""", RegexOption.IGNORE_CASE)
+        private val PROFILE_PCT_REGEX = Regex("""(?:→\s*)?profile\s+(\d+)%""", RegexOption.IGNORE_CASE)
+        private val SLEEP_IN_REGEX = Regex("""BOOST\s+INACTIVE\s*:\s*Sleep-?in""", RegexOption.IGNORE_CASE)
+        private val OUTSIDE_WINDOW_REGEX = Regex("""BOOST\s+INACTIVE\s*:\s*Outside\s+boost\s+time\s+window""", RegexOption.IGNORE_CASE)
+        private val BOOST_INACTIVE_REGEX = Regex("""BOOST\s+INACTIVE\s*:\s*(.+)""", RegexOption.IGNORE_CASE)
+        private val FINAL_TDD_REGEX = Regex("""Final\s+TDD\s*=\s*([\d.]+)""", RegexOption.IGNORE_CASE)
+        private val BLENDED_TDD_REGEX = Regex("""Blended\s+TDD\s*=\s*([\d.]+)""", RegexOption.IGNORE_CASE)
+        private val TDD_COLON_REGEX = Regex("""(?i)\bTDD\b\s*:\s*([\d.]+)""")
+        private val TIER_NAME_SPLIT_REGEX = Regex("""[.;,\n]""")
+        // Trailing parenthetical that contains a digit, e.g. " (144.0 > 100.80000030517578)"
+        private val NUMERIC_PARENS_REGEX = Regex("""\s*\([^)]*\d[^)]*\)\s*$""")
+        private val PROFILE_HEADER_REGEX = Regex("""Profile:\s*(\d+)%""")
+    }
+}

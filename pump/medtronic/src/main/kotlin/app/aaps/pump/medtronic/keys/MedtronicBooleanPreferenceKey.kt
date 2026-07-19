@@ -18,4 +18,6 @@ enum class MedtronicBooleanPreferenceKey(
 ) : BooleanPreferenceKey {
 
     SetNeutralTemp("set_neutral_temps", true),
+    LogInsulinChange("mdt_log_insulin_change", true),
+    LogBatteryChange("mdt_log_battery_change", true),
 }

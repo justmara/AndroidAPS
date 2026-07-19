@@ -96,6 +96,10 @@
     <string name="invalid_history_data">Invalid pump history data detected. Open new issue and provide logs.</string>
     <string name="riley_statistics">RL Stats</string>
     <string name="medtronic_history_type">Type:</string>
+    <string name="log_battery_change_title">Log battery change</string>
+    <string name="log_battery_change_summary">Import battery change records from pump history</string>
+    <string name="log_insulin_change_title">Log insulin change</string>
+    <string name="log_insulin_change_summary">Import reservoir change records from pump history</string>
 
     <string name="clicked_refresh" comment="26 characters max for translation">Clicked refresh</string>
     <string name="scheduled_status_refresh" comment="26 characters max for translation">Scheduled Status Refresh</string>

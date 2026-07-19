@@ -43,6 +43,7 @@ enum class IntKey(
     OverviewBattCritical("statuslights_bat_critical", 26, 0, 100, defaultedBySM = true, dependency = BooleanKey.OverviewShowStatusLights),
     OverviewBolusPercentage("boluswizard_percentage", 100, 10, 100),
     OverviewResetBolusPercentageTime("key_reset_boluswizard_percentage_time", 16, 6, 120, defaultedBySM = true, engineeringModeOnly = true),
+    OverviewBoostMode("overview_boost_mode", 0, 0, 2, defaultedBySM = true),
     ProtectionTimeout("protection_timeout", 1, 1, 180, defaultedBySM = true),
     ProtectionTypeSettings("settings_protection", 0, 0, 5),
     ProtectionTypeApplication("application_protection", 0, 0, 5),
@@ -50,14 +51,23 @@ enum class IntKey(
     SafetyMaxCarbs("treatmentssafety_maxcarbs", 48, 1, 200),
     LoopOpenModeMinChange("loop_openmode_min_change", 30, 0, 50, defaultedBySM = true),
     ApsMaxSmbFrequency("smbinterval", 3, 1, 10, defaultedBySM = true, dependency = BooleanKey.ApsUseSmb),
-    ApsMaxMinutesOfBasalToLimitSmb("smbmaxminutes", 30, 15, 120, defaultedBySM = true, dependency = BooleanKey.ApsUseSmb),
-    ApsUamMaxMinutesOfBasalToLimitSmb("uamsmbmaxminutes", 30, 15, 120, defaultedBySM = true, dependency = BooleanKey.ApsUseSmb),
-    ApsCarbsRequestThreshold("carbsReqThreshold", 1, 1, 100, defaultedBySM = true),
+    ApsMaxMinutesOfBasalToLimitSmb("smbmaxminutes", 30, 15, 420, defaultedBySM = true, dependency = BooleanKey.ApsUseSmb),
+    ApsUamMaxMinutesOfBasalToLimitSmb("uamsmbmaxminutes", 30, 15, 420, defaultedBySM = true, dependency = BooleanKey.ApsUseSmb),
+    ApsCarbsRequestThreshold("carbsReqThreshold", 1, 1, 10, defaultedBySM = true),
     ApsAutoIsfHalfBasalExerciseTarget("half_basal_exercise_target", 160, 120, 200, defaultedBySM = true),
     ApsAutoIsfIobThPercent("iob_threshold_percent", 100, 10, 100, defaultedBySM = true),
-    ApsDynIsfAdjustmentFactor("DynISFAdjust", 100, 1, 300, dependency = BooleanKey.ApsUseDynamicSensitivity),
+    // AutoISF 3.2.0 - activity detection & FSL calibration
+    FslCalibrationDuration("Calibration_Duration", 20, 20, 20, defaultedBySM = true),   // effectively frozen
+    MaintenanceCleanupDays("maintenance_cleanup_days", 93, 7, 93, defaultedBySM = true),
+    ActivityMonitorIdleStart("inactivity_idle_start", 22, 0, 23, defaultedBySM = true, dependency = BooleanKey.ActivityMonitorOvernight),
+    ActivityMonitorIdleEnd("inactivity_idle_end", 6, 0, 23, defaultedBySM = true, dependency = BooleanKey.ActivityMonitorOvernight),
+    ApsDynIsfAdjustmentFactor("DynISFAdjust", 50, 1, 200, dependency = BooleanKey.ApsUseDynamicSensitivity, negativeDependency = BooleanKey.ApsDynIsfUseProfileSens),
+    ApsDynIsfVelocity("DynISFVelocity", 80, 1, 200, dependency = BooleanKey.ApsUseDynamicSensitivity),
+    ApsDynamicCrFormula("dynamic_cr_formula", 0, 0, 1, dependency = BooleanKey.ApsUseDynamicCarbRatio),
+    // Capped below 120: at 120 the logarithmic insulinFactor (120 - peak) collapses and inflates the ratio.
+    ApsDynamicCrPeakTime("dynamic_cr_peak_time", 75, 35, 110, dependency = BooleanKey.ApsDynamicCrUseCustomPeakTime),
     AutosensPeriod("openapsama_autosens_period", 24, 4, 24, calculatedDefaultValue = true),
-    MaintenanceLogsAmount("maintenance_logs_amount", 2, 1, 10, defaultedBySM = true),
+    MaintenanceLogsAmount("maintenance_logs_amount", 10, 1, 1000, defaultedBySM = true),
     AlertsStaleDataThreshold("missed_bg_readings_threshold", 30, 15, 10000, defaultedBySM = true, dependency = BooleanKey.AlertMissedBgReading),
     AlertsPumpUnreachableThreshold("pump_unreachable_threshold", 30, 30, 300, defaultedBySM = true, dependency = BooleanKey.AlertPumpUnreachable),
     InsulinOrefPeak("insulin_oref_peak", 75, 35, 120, hideParentScreenIfHidden = true),
@@ -74,6 +84,24 @@ enum class IntKey(
 
     SiteRotationUserProfile("site_rotation_user_profile", 0, 0, 2),
 
+    // Boost
+    ApsBoostInactivitySteps("boost_inactivity_steps", 500, 0, 1000, defaultedBySM = true),
+    ApsBoostSleepInSteps("boost_sleep_in_steps", 250, 0, 1000, defaultedBySM = true),
+    ApsBoostActivitySteps5("boost_activity_steps_5", 420, 0, 5000, defaultedBySM = true),
+    ApsBoostActivitySteps15("boost_activity_steps_15", 800, 0, 10000, defaultedBySM = true),
+    ApsBoostActivitySteps30("boost_activity_steps_30", 1200, 0, 10000, defaultedBySM = true),
+    ApsBoostActivitySteps60("boost_activity_steps_60", 1800, 0, 10000, defaultedBySM = true),
+    ApsBoostDynIsfAdjustmentFactor("boost_DynISFAdjust", 100, 1, 300),
+    ApsBoostHrMaxBpm("boost_hr_max_bpm", 180, 150, 220, defaultedBySM = true),
+    ApsBoostHrRestingBpm("boost_hr_resting_bpm", 60, 30, 100, defaultedBySM = true),
+    ApsBoostHrWindowMinutes("boost_hr_window_minutes", 15, 5, 60, defaultedBySM = true),
+    ApsBoostPostExerciseMinDuration("boost_post_exercise_min_duration", 10, 1, 120, defaultedBySM = true),
+
+    // Boost V5/V6 sleep + Health Connect poll (ported from boost_v6)
+    ApsBoostPreSleepLeadMin("boost_pre_sleep_lead_min", 60, 0, 180, defaultedBySM = true),
+    ApsBoostSleepHysteresisMin("boost_sleep_hysteresis_min", 10, 5, 30, defaultedBySM = true),
+    ApsBoostWakeHrHysteresisMin("boost_wake_hr_hysteresis_min", 5, 2, 15, defaultedBySM = true),
+    ApsBoostHealthConnectPollMin("boost_health_connect_poll_min", 5, 1, 30, defaultedBySM = true),
 
     // Eating Now
 

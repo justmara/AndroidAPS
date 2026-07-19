@@ -1,11 +1,11 @@
 package app.aaps.plugins.sync.nsclientV3.services
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.annotation.OpenForTesting
+import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
@@ -63,12 +63,22 @@ class NSClientV3Service : DaggerService() {
     private var wakeLock: PowerManager.WakeLock? = null
     private val binder: IBinder = LocalBinder()
 
-    @SuppressLint("WakelockTimeout")
     override fun onCreate() {
         super.onCreate()
-        wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AndroidAPS:NSClientService")
-        wakeLock?.acquire()
+        // Non-reference-counted so repeated acquire() calls just re-arm the timeout (no stacked refs).
+        // Bounded by WAKELOCK_TIMEOUT instead of held forever: NSClientV3Plugin.runLoop re-arms it on
+        // every heartbeat (<= 5 min) while sync is alive, so it auto-releases only if that heartbeat
+        // stops (stuck service / dead handler) instead of pinning the CPU indefinitely.
+        wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AndroidAPS:NSClientService")
+            .apply { setReferenceCounted(false) }
+        wakeLock?.acquire(WAKELOCK_TIMEOUT)
         initializeWebSockets("onCreate")
+    }
+
+    /** Re-arm the partial wake lock from the plugin's runLoop heartbeat. See [onCreate]. */
+    fun refreshWakeLock() {
+        wakeLock?.acquire(WAKELOCK_TIMEOUT)
     }
 
     override fun onDestroy() {
@@ -94,18 +104,20 @@ class NSClientV3Service : DaggerService() {
 
     @OpenForTesting
     fun shutdownWebsockets() {
-        storageSocket?.on(Socket.EVENT_CONNECT, onConnectStorage)
-        storageSocket?.on(Socket.EVENT_DISCONNECT, onDisconnectStorage)
-        storageSocket?.on("create", onDataCreateUpdate)
-        storageSocket?.on("update", onDataCreateUpdate)
-        storageSocket?.on("delete", onDataDelete)
+        // Remove (off) the listeners — otherwise they stay registered in the static IO.managers
+        // socket pool and keep this Service alive after onDestroy().
+        storageSocket?.off(Socket.EVENT_CONNECT, onConnectStorage)
+        storageSocket?.off(Socket.EVENT_DISCONNECT, onDisconnectStorage)
+        storageSocket?.off("create", onDataCreateUpdate)
+        storageSocket?.off("update", onDataCreateUpdate)
+        storageSocket?.off("delete", onDataDelete)
         storageSocket?.disconnect()
-        alarmSocket?.on(Socket.EVENT_CONNECT, onConnectAlarms)
-        alarmSocket?.on(Socket.EVENT_DISCONNECT, onDisconnectAlarm)
-        alarmSocket?.on("announcement", onAnnouncement)
-        alarmSocket?.on("alarm", onAlarm)
-        alarmSocket?.on("urgent_alarm", onUrgentAlarm)
-        alarmSocket?.on("clear_alarm", onClearAlarm)
+        alarmSocket?.off(Socket.EVENT_CONNECT, onConnectAlarms)
+        alarmSocket?.off(Socket.EVENT_DISCONNECT, onDisconnectAlarm)
+        alarmSocket?.off("announcement", onAnnouncement)
+        alarmSocket?.off("alarm", onAlarm)
+        alarmSocket?.off("urgent_alarm", onUrgentAlarm)
+        alarmSocket?.off("clear_alarm", onClearAlarm)
         alarmSocket?.disconnect()
         wsConnected = false
         storageSocket = null
@@ -343,5 +355,11 @@ class NSClientV3Service : DaggerService() {
     fun handleClearAlarm(originalAlarm: NSAlarm, silenceTimeInMilliseconds: Long) {
         alarmSocket?.emit("ack", originalAlarm.level, originalAlarm.group, silenceTimeInMilliseconds)
         rxBus.send(EventNSClientNewLog("► ALARMACK ", "${originalAlarm.level} ${originalAlarm.group} $silenceTimeInMilliseconds"))
+    }
+
+    companion object {
+
+        // Generous vs the plugin's <= 5 min runLoop heartbeat that re-arms it; only fires if that stops.
+        private val WAKELOCK_TIMEOUT = T.mins(15).msecs()
     }
 }

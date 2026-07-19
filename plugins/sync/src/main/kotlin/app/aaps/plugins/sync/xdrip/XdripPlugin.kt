@@ -256,7 +256,8 @@ class XdripPlugin @Inject constructor(
 
         //Temp basal
         processedTbrEbData.getTempBasalIncludingConvertedExtended(System.currentTimeMillis())?.let {
-            status.append(it.toStringShort(rh)).append(" ")
+            val usePercentage = preferences.get(BooleanKey.OverviewBasalIsAlwaysNotAbsolute)
+            status.append(it.toStringShort(usePercentage, profile.getBasal(), rh)).append(" ")
         }
         //IOB
         val bolusIob = iobCobCalculator.calculateIobFromBolus().round()

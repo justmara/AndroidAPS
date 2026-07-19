@@ -30,7 +30,7 @@ class InsertBolusWithTempIdTransactionTest {
         val bolus = createBolus(tempId = 500L, amount = 5.0)
 
         whenever(bolusDao.findByPumpTempIds(500L, InterfaceIDs.PumpType.DANA_I, "ABC123")).thenReturn(null)
-        whenever(bolusDao.insert(bolus)).thenReturn(1L)
+        whenever(bolusDao.insertNewEntry(bolus)).thenReturn(1L)
 
         val transaction = InsertBolusWithTempIdTransaction(bolus)
         transaction.database = database
@@ -39,7 +39,7 @@ class InsertBolusWithTempIdTransactionTest {
         assertThat(result.inserted).hasSize(1)
         assertThat(bolus.id).isEqualTo(1L)
 
-        verify(bolusDao).insert(bolus)
+        verify(bolusDao).insertNewEntry(bolus)
     }
 
     @Test
@@ -55,7 +55,7 @@ class InsertBolusWithTempIdTransactionTest {
 
         assertThat(result.inserted).isEmpty()
 
-        verify(bolusDao, never()).insert(any())
+        verify(bolusDao, never()).insertNewEntry(any())
     }
 
     private fun createBolus(

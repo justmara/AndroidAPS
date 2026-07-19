@@ -24,6 +24,7 @@ import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.workflow.CalculationWorkflow
 import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.workflow.LoggingWorker
 import app.aaps.core.utils.receivers.DataWorkerStorage
@@ -72,9 +73,9 @@ class IobCobOref1Worker(
 
         val start = dateUtil.now()
         try {
-            aapsLogger.debug(LTag.AUTOSENS, "AUTOSENSDATA thread started: ${data.reason}")
+            aapsLogger.debug(LTag.AUTOSENS) { "AUTOSENSDATA thread started: ${data.reason}" }
             if (!profileFunction.isProfileValid("IobCobThread")) {
-                aapsLogger.debug(LTag.AUTOSENS, "Aborting calculation thread (No profile): ${data.reason}")
+                aapsLogger.debug(LTag.AUTOSENS) { "Aborting calculation thread (No profile): ${data.reason}" }
                 return Result.success(workDataOf("Error" to "app still initializing"))
             }
             //log.debug("Locking calculateSensitivityData");
@@ -90,11 +91,27 @@ class IobCobOref1Worker(
             val prevDataTime = ads.roundUpTime(bucketedData[bucketedData.size - 3].timestamp)
             aapsLogger.debug(LTag.AUTOSENS) { "Prev data time: " + dateUtil.dateAndTimeString(prevDataTime) }
             var previous = autosensDataTable[prevDataTime]
+            // Preload all expanded carbs for the whole detection window once, then filter per 5-min
+            // bucket in memory below. This replaces one blocking Room query per bucket (hundreds per
+            // run) with a single query. expand()+fromTo() are deterministic and the per-bucket filter
+            // uses the same inclusive window, so results are identical to calling
+            // getCarbsFromTimeToTimeExpanded() for each bucket. The wide margins are harmless because
+            // the per-bucket filter is exact.
+            val preloadCarbsStart = oldestTimeWithData - T.mins(10).msecs()
+            val preloadCarbsEnd = ads.roundUpTime(dateUtil.now())
+            val preloadedCarbs = persistenceLayer.getCarbsFromTimeToTimeExpanded(preloadCarbsStart, preloadCarbsEnd, true)
             // start from oldest to be able sub cob
+            var lastProgress = -1
             for (i in bucketedData.size - 4 downTo 0) {
-                rxBus.send(EventIobCalculationProgress(CalculationWorkflow.ProgressData.IOB_COB_OREF, 100 - (100.0 * i / bucketedData.size).toInt(), data.cause))
+                // Only emit when the integer percent actually changes to avoid flooding the
+                // UI thread with hundreds of identical progress events per calculation.
+                val progress = 100 - (100.0 * i / bucketedData.size).toInt()
+                if (progress != lastProgress) {
+                    lastProgress = progress
+                    rxBus.send(EventIobCalculationProgress(CalculationWorkflow.ProgressData.IOB_COB_OREF, progress, data.cause))
+                }
                 if (isStopped) {
-                    aapsLogger.debug(LTag.AUTOSENS, "Aborting calculation thread (trigger): ${data.reason}")
+                    aapsLogger.debug(LTag.AUTOSENS) { "Aborting calculation thread (trigger): ${data.reason}" }
                     return Result.failure(workDataOf("Error" to "Aborting calculation thread (trigger): ${data.reason}"))
                 }
                 // check if data already exists
@@ -108,10 +125,10 @@ class IobCobOref1Worker(
                 }
                 val profile = profileFunction.getProfile(bgTime)
                 if (profile == null) {
-                    aapsLogger.debug(LTag.AUTOSENS, "Aborting calculation thread (no profile): ${data.reason}")
+                    aapsLogger.debug(LTag.AUTOSENS) { "Aborting calculation thread (no profile): ${data.reason}" }
                     continue  // profile not set yet
                 }
-                aapsLogger.debug(LTag.AUTOSENS, "Processing calculation thread: ${data.reason} ($i/${bucketedData.size})")
+                aapsLogger.debug(LTag.AUTOSENS) { "Processing calculation thread: ${data.reason} ($i/${bucketedData.size})" }
                 val autosensData = autosensDataProvider.get()
                 autosensData.time = bgTime
                 if (previous != null) autosensData.activeCarbsList = previous.cloneCarbsList() else autosensData.activeCarbsList = ArrayList()
@@ -189,7 +206,7 @@ class IobCobOref1Worker(
                 }
                 // Use exclusive start (+1ms) to avoid double-counting carbs at window boundaries
                 // when consecutive 5-min windows share a boundary timestamp (issue #4596)
-                val recentCarbTreatments = persistenceLayer.getCarbsFromTimeToTimeExpanded(bgTime - T.mins(5).msecs() + 1, bgTime, true)
+                val recentCarbTreatments = preloadedCarbs.filter { it.timestamp in (bgTime - T.mins(5).msecs() + 1)..bgTime }
                 for (recentCarbTreatment in recentCarbTreatments) {
                     autosensData.carbsFromBolus += recentCarbTreatment.amount
                     val isAAPSOrWeighted = activePlugin.activeSensitivity.isMinCarbsAbsorptionDynamic
@@ -297,13 +314,14 @@ class IobCobOref1Worker(
 
                 // add an extra negative deviation if a high temp target is running and exercise mode is set
                 // TODO AS-FIX
-                // @Suppress("SimplifyBooleanWithConstants", "KotlinConstantConditions")
-                // if (false && sp.getBoolean(app.aaps.core.utils.R.string.key_high_temptarget_raises_sensitivity, SMBDefaults.high_temptarget_raises_sensitivity)) {
-                //     val tempTarget = persistenceLayer.getTemporaryTargetActiveAt(dateUtil.now())
-                //     if (tempTarget != null && tempTarget.target() >= 100) {
-                //         autosensData.extraDeviation.add(-(tempTarget.target() - 100) / 20)
-                //     }
-                // }
+                @Suppress("SimplifyBooleanWithConstants", "KotlinConstantConditions")
+                if (preferences.get(BooleanKey.ApsAutoIsfHighTtRaisesSens)) {
+                    val tempTarget = persistenceLayer.getTemporaryTargetActiveAt(dateUtil.now())
+                    if (tempTarget != null && tempTarget.lowTarget >= 100) {
+                        val avgTarget = (tempTarget.lowTarget + tempTarget.highTarget) / 2
+                        autosensData.extraDeviation.add(-(avgTarget - 100) / 20)
+                    }
+                }
 
                 // add one neutral deviation every 2 hours to help decay over long exclusion periods
                 val calendar = GregorianCalendar()
@@ -317,8 +335,8 @@ class IobCobOref1Worker(
                     "Running detectSensitivity from: " + dateUtil.dateAndTimeString(oldestTimeWithData) + " to: " + dateUtil.dateAndTimeString(bgTime) + " lastDataTime:" + ads.lastDataTime(dateUtil)
                 }
                 val sensitivity = activePlugin.activeSensitivity.detectSensitivity(ads, oldestTimeWithData, bgTime)
-                aapsLogger.debug(LTag.AUTOSENS, "Sensitivity result: $sensitivity")
                 autosensData.autosensResult = sensitivity
+                aapsLogger.debug(LTag.AUTOSENS) { "Sensitivity result: $sensitivity" }
                 aapsLogger.debug(LTag.AUTOSENS) { autosensData.toString() }
             }
             data.iobCobCalculator.ads = ads

@@ -127,6 +127,7 @@ open class Notification {
         const val MDT_INVALID_HISTORY_DATA = 76
         const val IDENTIFICATION_NOT_SET = 77
         const val PERMISSION_BT = 78
+        const val PERMISSION_ACTIVITY_RECOGNITION = 79
         const val EOFLOW_PATCH_ALERTS = 79
         const val PUMP_SUSPENDED = 80
         const val COMBO_UNKNOWN_TBR = 81
@@ -145,6 +146,8 @@ open class Notification {
         const val EQUIL_ALARM_INSULIN = 94
 
         const val USER_MESSAGE = 1000
+
+        const val PERMISSION_EXTERNAL_STORAGE = 2000
 
         const val IMPORTANCE_HIGH = 2
         const val CATEGORY_ALARM = "alarm"

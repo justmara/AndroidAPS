@@ -44,6 +44,10 @@
     <string name="maxvalueinpreferences">max value in preferences</string>
     <string name="hardlimit">hard limit</string>
     <string name="treatmentssafety_title">Treatments safety</string>
+    <string name="always_promote_advanced_filtering_title">Always promote advanced filtering</string>
+    <string name="always_promote_advanced_filtering_summary">[DANGEROUS] Disable CGM whitelist, allows SMBs being always enabled on all CGMs</string>
+    <string name="allow_recalculated_bgs_title">Allow recalculated BG</string>
+    <string name="allow_recalculated_bgs_summary">[DANGEROUS] Allow delta and acceleration calculation using recalculated values</string>
 
     <!-- Objectives -->
     <string name="completed_well_done">Completed, well done!</string>
@@ -62,5 +66,17 @@
     <string name="objectives_button_unfinish">Reset finished state</string>
     <string name="objectives_button_unstart">Reset started state</string>
 
+    <!-- Night mode -->
+    <string name="night_mode">Night mode</string>
+    <string name="night_mode_begin">Night mode beginning</string>
+    <string name="night_mode_end">Night mode ending</string>
+    <string name="night_mode_bg_offset">Night mode target BG offset</string>
+    <string name="night_mode_bg_offset_summary">If BG is higher than Target BG plus Target BG offset, there would be no SMBs.</string>
+    <string name="night_mode_cob">Disable night mode with COB</string>
+    <string name="night_mode_lowtt">Disable night mode with low TT</string>
+    <string name="night_mode_smbs_disabled">SMBs are disabled because of an active night mode</string>
+    <string name="night_mode_disabled">Night mode is disabled: %1$s</string>
 
+    <!-- BG Threshold -->
+    <string name="bg_threshold_smbs_disabled">SMBs are disabled because of BG lower than threshold: %1$d &lt; %2$d</string>
 </resources>

@@ -30,7 +30,7 @@ class InsertTemporaryBasalWithTempIdTransactionTest {
         val tb = createTemporaryBasal(tempId = 500L, rate = 1.5, duration = 60_000L)
 
         whenever(temporaryBasalDao.findByPumpTempIds(500L, InterfaceIDs.PumpType.DANA_I, "ABC123")).thenReturn(null)
-        whenever(temporaryBasalDao.insert(tb)).thenReturn(1L)
+        whenever(temporaryBasalDao.insertNewEntry(tb)).thenReturn(1L)
 
         val transaction = InsertTemporaryBasalWithTempIdTransaction(tb)
         transaction.database = database
@@ -39,7 +39,7 @@ class InsertTemporaryBasalWithTempIdTransactionTest {
         assertThat(result.inserted).hasSize(1)
         assertThat(tb.id).isEqualTo(1L)
 
-        verify(temporaryBasalDao).insert(tb)
+        verify(temporaryBasalDao).insertNewEntry(tb)
     }
 
     @Test
@@ -55,7 +55,7 @@ class InsertTemporaryBasalWithTempIdTransactionTest {
 
         assertThat(result.inserted).isEmpty()
 
-        verify(temporaryBasalDao, never()).insert(any())
+        verify(temporaryBasalDao, never()).insertNewEntry(any())
     }
 
     private fun createTemporaryBasal(

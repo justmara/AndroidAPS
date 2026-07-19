@@ -24,6 +24,16 @@ data class OapsProfileAutoIsf(
     var adv_target_adjustments: Boolean,
     var exercise_mode: Boolean,
     var half_basal_exercise_target: Int,
+    // AutoISF 3.2.0 - activity monitor (optional, populated by OpenAPSAutoISFPlugin)
+    val activity_detection: Boolean? = false,
+    val recent_steps_5_minutes: Int? = 0,
+    val recent_steps_10_minutes: Int? = 0,
+    val recent_steps_15_minutes: Int? = 0,
+    val recent_steps_30_minutes: Int? = 0,
+    val recent_steps_60_minutes: Int? = 0,
+    val phone_moved: Boolean? = false,
+    val time_since_start: Long? = 0,
+    val now: Int? = 0,
     var maxCOB: Int,
     var skip_neutral_temps: Boolean,
     var remainingCarbsCap: Int,
@@ -63,5 +73,9 @@ data class OapsProfileAutoIsf(
     var smb_max_range_extension: Double,
     var enableSMB_EvenOn_OddOff_always: Boolean,
     var iob_threshold_percent: Int,
-    var profile_percentage: Int
+    var profile_percentage: Int,
+
+    // Dynamic / Auto Carb Ratio (ported from iAPS/Trio). 0.0 = disabled (DetermineBasal uses profile.carb_ratio).
+    var dynamicCarbRatio: Double = 0.0,
+    var dynamicCarbRatioReason: String = ""
 )

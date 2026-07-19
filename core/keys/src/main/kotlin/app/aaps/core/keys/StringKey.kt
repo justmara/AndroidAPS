@@ -51,6 +51,10 @@ enum class StringKey(
     NsClientWifiSsids("ns_wifi_ssids", "", dependency = BooleanKey.NsClientUseWifi),
     NsClientAccessToken("nsclient_token", "", isPassword = true),
 
+    NightModeBegin("night_mode_begin", "22:00", dependency = BooleanKey.NightMode),
+    NightModeEnd("night_mode_end", "06:00", dependency = BooleanKey.NightMode),
+    GarminRequestKey(key = "garmin_aaps_key", defaultValue = ""),
+
     // Google Drive settings
     GoogleDriveStorageType("google_drive_storage_type", "local"),
     GoogleDriveFolderId("google_drive_folder_id", ""),
@@ -58,4 +62,23 @@ enum class StringKey(
 
     PumpCommonBolusStorage("pump_sync_storage_bolus", ""),
     PumpCommonTbrStorage("pump_sync_storage_tbr", ""),
+
+    // Boost
+    ApsBoostStartTime("boost_start_time", "07:00", defaultedBySM = true),
+    ApsBoostEndTime("boost_end_time", "07:01", defaultedBySM = true),
+    ApsBoostNightModeStart("boost_night_mode_start", "22:00", defaultedBySM = true),
+    ApsBoostNightModeEnd("boost_night_mode_end", "07:00", defaultedBySM = true),
+
+    // Boost V5 silent-shadow persisted state (JSON blob)
+    ApsBoostV5State("boost_v5_state", "", defaultedBySM = true),
+
+    // Boost ISF shadow — persisted EMA(τ=3h) state
+    ApsBoostIsfShadowState("boost_isf_shadow_state", "", defaultedBySM = true),
+
+    // Boost V5/V6 persisted state blobs (ported from boost_v6)
+    ApsBoostSleepState("boost_sleep_state", "", defaultedBySM = true),
+    ApsBoostSleepHistory("boost_sleep_history", "", defaultedBySM = true),
+    ApsBoostMlRingBuffer("boost_ml_ring_buffer", "", defaultedBySM = true),
+    ApsBoostMealTimeHistory("boost_meal_time_history", "", defaultedBySM = true),
+    ApsBoostDailyStepHistory("boost_daily_step_history", "", defaultedBySM = true),
 }

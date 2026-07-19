@@ -42,7 +42,8 @@ data class NSDeviceStatus(
 
         @Serializable data class Battery(
             @SerializedName("percent") val percent: Int?,
-            @SerializedName("voltage") val voltage: Double?
+            @SerializedName("voltage") val voltage: Double?,
+            @SerializedName("rileylink_percent") val rileyLinkPercent: Int?
         )
 
         @Serializable data class Status(

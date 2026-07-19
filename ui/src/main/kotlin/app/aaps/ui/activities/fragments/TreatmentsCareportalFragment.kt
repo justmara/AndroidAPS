@@ -67,6 +67,7 @@ class TreatmentsCareportalFragment : DaggerFragment(), MenuProvider {
     private val millsToThePast = T.days(30).msecs()
     private lateinit var actionHelper: ActionModeHelper<TE>
     private var showInvalidated = false
+    private var showProfileChanges = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         TreatmentsCareportalFragmentBinding.inflate(inflater, container, false).also { _binding = it }.root
@@ -94,17 +95,21 @@ class TreatmentsCareportalFragment : DaggerFragment(), MenuProvider {
     fun swapAdapter() {
         val now = System.currentTimeMillis()
         binding.recyclerview.isLoading = true
-        disposable +=
+        val source =
             if (showInvalidated)
-                persistenceLayer
-                    .getTherapyEventDataIncludingInvalidFromTime(now - millsToThePast, false)
-                    .observeOn(aapsSchedulers.main)
-                    .subscribe { list -> binding.recyclerview.swapAdapter(RecyclerViewAdapter(list), true) }
+                persistenceLayer.getTherapyEventDataIncludingInvalidFromTime(now - millsToThePast, false)
             else
-                persistenceLayer
-                    .getTherapyEventDataFromTime(now - millsToThePast, false)
-                    .observeOn(aapsSchedulers.main)
-                    .subscribe { list -> binding.recyclerview.swapAdapter(RecyclerViewAdapter(list), true) }
+                persistenceLayer.getTherapyEventDataFromTime(now - millsToThePast, false)
+        disposable += source
+            .observeOn(aapsSchedulers.main)
+            .subscribe { list ->
+                // Profile-edit notes are a separate category; hide them from the therapy list
+                // unless explicitly enabled (mirrors the graph's "Profile change" toggle).
+                val filtered =
+                    if (showProfileChanges) list
+                    else list.filterNot { it.type == TE.Type.NOTE && it.enteredBy == TE.ENTERED_BY_PROFILE_EDIT }
+                binding.recyclerview.swapAdapter(RecyclerViewAdapter(filtered), true)
+            }
     }
 
     @Synchronized
@@ -181,6 +186,8 @@ class TreatmentsCareportalFragment : DaggerFragment(), MenuProvider {
     private fun updateMenuVisibility() {
         menu?.findItem(R.id.nav_hide_invalidated)?.isVisible = showInvalidated
         menu?.findItem(R.id.nav_show_invalidated)?.isVisible = !showInvalidated
+        menu?.findItem(R.id.nav_hide_profile_changes)?.isVisible = showProfileChanges
+        menu?.findItem(R.id.nav_show_profile_changes)?.isVisible = !showProfileChanges
     }
 
     override fun onMenuItemSelected(item: MenuItem): Boolean =
@@ -199,6 +206,22 @@ class TreatmentsCareportalFragment : DaggerFragment(), MenuProvider {
                 showInvalidated = false
                 updateMenuVisibility()
                 ToastUtils.infoToast(context, R.string.hide_invalidated_records)
+                swapAdapter()
+                true
+            }
+
+            R.id.nav_show_profile_changes  -> {
+                showProfileChanges = true
+                updateMenuVisibility()
+                ToastUtils.infoToast(context, R.string.show_profile_changes)
+                swapAdapter()
+                true
+            }
+
+            R.id.nav_hide_profile_changes  -> {
+                showProfileChanges = false
+                updateMenuVisibility()
+                ToastUtils.infoToast(context, R.string.hide_profile_changes)
                 swapAdapter()
                 true
             }

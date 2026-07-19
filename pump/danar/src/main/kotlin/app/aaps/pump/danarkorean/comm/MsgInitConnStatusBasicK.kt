@@ -28,7 +28,7 @@ class MsgInitConnStatusBasicK(
         aapsLogger.debug(LTag.PUMPCOMM, "isUtilityEnable: $isUtilityEnable")
         aapsLogger.debug(LTag.PUMPCOMM, "Is EasyUI Enabled: " + danaPump.isEasyModeEnabled)
         aapsLogger.debug(LTag.PUMPCOMM, "easyUIMode: $easyUIMode")
-        aapsLogger.debug(LTag.PUMPCOMM, "Pump password: " + danaPump.password)
+        aapsLogger.debug(LTag.PUMPCOMM, "Pump password received")
         if (danaPump.isEasyModeEnabled) {
             uiInteraction.addNotification(Notification.EASY_MODE_ENABLED, rh.gs(app.aaps.pump.dana.R.string.danar_disableeasymode), Notification.URGENT)
         } else {

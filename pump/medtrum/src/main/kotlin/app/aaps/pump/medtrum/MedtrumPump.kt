@@ -275,9 +275,9 @@ class MedtrumPump @Inject constructor(
             preferences.put(MedtrumDoubleNonKey.BolusAmountToBeDelivered, value)
         }
 
-    var bolusProgressLastTimeStamp: Long = 0 // timestamp of last bolus progress message
-    var bolusStopped = false // bolus stopped by user
-    var bolusDone = true // Bolus completed or stopped on pump, initialize as true as to don't show bolus on init
+    @Volatile var bolusProgressLastTimeStamp: Long = 0 // timestamp of last bolus progress message
+    @Volatile var bolusStopped = false // bolus stopped by user
+    @Volatile var bolusDone = true // Bolus completed or stopped on pump, initialize as true as to don't show bolus on init
     var bolusErrorReason: String? = null
 
     private val _bolusAmountDelivered = MutableStateFlow(0.0)

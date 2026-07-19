@@ -10,10 +10,13 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.RM
+import app.aaps.core.data.model.TE
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.data.ue.ValueWithUnit
 import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.insulin.Insulin
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.logging.UserEntryLogger
@@ -60,6 +63,7 @@ class ProfileFragment : DaggerFragment() {
     @Inject lateinit var dateUtil: DateUtil
     @Inject lateinit var aapsSchedulers: AapsSchedulers
     @Inject lateinit var uel: UserEntryLogger
+    @Inject lateinit var persistenceLayer: PersistenceLayer
     @Inject lateinit var uiInteraction: UiInteraction
     @Inject lateinit var decimalFormatter: DecimalFormatter
     @Inject lateinit var loop: Loop
@@ -131,6 +135,7 @@ class ProfileFragment : DaggerFragment() {
         val aps = activePlugin.activeAPS
         binding.isfDynamicLabel.visibility = aps.supportsDynamicIsf().toVisibility()
         binding.icDynamicLabel.visibility = aps.supportsDynamicIc().toVisibility()
+        binding.diaDynamicLabel.visibility = (activePlugin.activeInsulin.id == Insulin.InsulinType.OREF_LYUMJEV).toVisibility()
     }
 
     fun build() {
@@ -339,11 +344,21 @@ class ProfileFragment : DaggerFragment() {
             if (!profilePlugin.isValidEditState(activity)) {
                 return@setOnClickListener  //Should not happen as saveButton should not be visible if not valid
             }
-            uel.log(
-                action = Action.STORE_PROFILE, source = Sources.LocalProfile,
-                value = ValueWithUnit.SimpleString(profilePlugin.currentProfile()?.name ?: "")
-            )
-            profilePlugin.storeSettings(activity, dateUtil.now())
+            val now = dateUtil.now()
+            // Diff persisted vs edited profiles BEFORE storeSettings overwrites preferences.
+            // Persisting each change as a NOTE therapy event both logs a STORE_PROFILE UserEntry
+            // (local history) and syncs to Nightscout via the treatments endpoint. Distinct
+            // timestamps keep the IfNewByTimestamp insert from de-duplicating multiple changes.
+            profilePlugin.profileEditNotes().forEachIndexed { index, (name, text) ->
+                disposable += persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
+                    therapyEvent = TE(timestamp = now + index, type = TE.Type.NOTE, note = text, enteredBy = TE.ENTERED_BY_PROFILE_EDIT, glucoseUnit = GlucoseUnit.MGDL),
+                    action = Action.STORE_PROFILE,
+                    source = Sources.LocalProfile,
+                    note = text,
+                    listValues = listOf(ValueWithUnit.SimpleString(name))
+                ).subscribe({ }, fabricPrivacy::logException)
+            }
+            profilePlugin.storeSettings(activity, now)
             build()
         }
         updateGUI()

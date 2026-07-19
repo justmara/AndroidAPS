@@ -2,12 +2,15 @@
 package app.aaps.di
 
 import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.plugins.aps.EN.ENPlugin
 import app.aaps.plugins.aps.autotune.AutotunePlugin
 import app.aaps.plugins.aps.loop.LoopPlugin
 import app.aaps.plugins.aps.openAPSAMA.OpenAPSAMAPlugin
 import app.aaps.plugins.aps.openAPSAutoISF.OpenAPSAutoISFPlugin
+import app.aaps.plugins.aps.openAPSBoost.OpenAPSBoostPlugin
+import app.aaps.plugins.aps.openAPSBoostV2.OpenAPSBoostV2Plugin
+import app.aaps.plugins.aps.openAPSBoostV5.OpenAPSBoostV5Plugin
 import app.aaps.plugins.aps.openAPSSMB.OpenAPSSMBPlugin
-import app.aaps.plugins.aps.EN.ENPlugin
 import app.aaps.plugins.automation.AutomationPlugin
 import app.aaps.plugins.configuration.configBuilder.ConfigBuilderPlugin
 import app.aaps.plugins.configuration.maintenance.MaintenancePlugin
@@ -19,6 +22,8 @@ import app.aaps.plugins.constraints.signatureVerifier.SignatureVerifierPlugin
 import app.aaps.plugins.constraints.storage.StorageConstraintPlugin
 import app.aaps.plugins.constraints.versionChecker.VersionCheckerPlugin
 import app.aaps.plugins.insulin.InsulinLyumjevPlugin
+import app.aaps.plugins.insulin.InsulinLyumjevU100PDPlugin
+import app.aaps.plugins.insulin.InsulinLyumjevU200PDPlugin
 import app.aaps.plugins.insulin.InsulinOrefFreePeakPlugin
 import app.aaps.plugins.insulin.InsulinOrefRapidActingPlugin
 import app.aaps.plugins.insulin.InsulinOrefUltraRapidActingPlugin
@@ -33,6 +38,7 @@ import app.aaps.plugins.main.profile.ProfilePlugin
 import app.aaps.plugins.sensitivity.SensitivityAAPSPlugin
 import app.aaps.plugins.sensitivity.SensitivityOref1Plugin
 import app.aaps.plugins.sensitivity.SensitivityWeightedAveragePlugin
+import app.aaps.plugins.smoothing.UnscentedKalmanFilterPlugin
 import app.aaps.plugins.smoothing.AvgSmoothingPlugin
 import app.aaps.plugins.smoothing.ExponentialSmoothingPlugin
 import app.aaps.plugins.smoothing.NoSmoothingPlugin
@@ -122,6 +128,18 @@ abstract class PluginsListModule {
     @IntoMap
     @IntKey(42)
     abstract fun bindInsulinLyumjevPlugin(plugin: InsulinLyumjevPlugin): PluginBase
+
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(43)
+    abstract fun bindInsulinLyumjevU100PDPlugin(plugin: InsulinLyumjevU100PDPlugin): PluginBase
+
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(44)
+    abstract fun bindInsulinLyumjevU200PDPlugin(plugin: InsulinLyumjevU200PDPlugin): PluginBase
 
     @Binds
     @AllConfigs
@@ -254,6 +272,25 @@ abstract class PluginsListModule {
     @IntoMap
     @IntKey(225)
     abstract fun bindOpenAPSAutoISFPlugin(plugin: OpenAPSAutoISFPlugin): PluginBase
+
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(230)
+    abstract fun bindOpenAPSBoostPlugin(plugin: OpenAPSBoostPlugin): PluginBase
+
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(231)
+    abstract fun bindOpenAPSBoostV2Plugin(plugin: OpenAPSBoostV2Plugin): PluginBase
+
+    // "Boost V6" — the user-selectable rebrand of the V5 engine (showInList { config.APS }).
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(232)
+    abstract fun bindOpenAPSBoostV5Plugin(plugin: OpenAPSBoostV5Plugin): PluginBase
 
     @Binds
     @APS
@@ -494,6 +531,12 @@ abstract class PluginsListModule {
     @IntoMap
     @IntKey(610)
     abstract fun bindAvgSmoothingPlugin(plugin: AvgSmoothingPlugin): PluginBase
+
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(615)
+    abstract fun bindUnscentedKalmanFilterPlugin(plugin: UnscentedKalmanFilterPlugin): PluginBase
 
     @Qualifier
     annotation class AllConfigs

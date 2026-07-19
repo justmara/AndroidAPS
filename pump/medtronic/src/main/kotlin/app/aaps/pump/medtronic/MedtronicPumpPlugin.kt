@@ -104,6 +104,8 @@ import app.aaps.pump.medtronic.util.MedtronicUtil
 import app.aaps.pump.medtronic.util.MedtronicUtil.Companion.isSame
 import app.aaps.pump.medtronic.driver.MedtronicPumpDriverConfiguration
 import org.joda.time.LocalDateTime
+import org.json.JSONException
+import org.json.JSONObject
 import java.util.Calendar
 import java.util.GregorianCalendar
 import java.util.Locale
@@ -574,7 +576,7 @@ class MedtronicPumpPlugin @Inject constructor(
         return DateTimeUtil.toATechDate(timestamp)
     }
 
-    private var bolusDeliveryType = BolusDeliveryType.Idle
+    @Volatile private var bolusDeliveryType = BolusDeliveryType.Idle
 
     private enum class BolusDeliveryType {
         Idle,  //
@@ -1379,7 +1381,17 @@ class MedtronicPumpPlugin @Inject constructor(
                     summary = app.aaps.pump.common.hw.rileylink.R.string.riley_link_show_battery_level_summary
                 )
             )
+            addPreference(
+                AdaptiveSwitchPreference(
+                    ctx = context,
+                    booleanKey = RileylinkBooleanPreferenceKey.FastMode,
+                    title = app.aaps.pump.common.hw.rileylink.R.string.riley_link_fast_mode,
+                    summary = app.aaps.pump.common.hw.rileylink.R.string.riley_link_fast_mode_summary
+                )
+            )
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = MedtronicBooleanPreferenceKey.SetNeutralTemp, title = R.string.set_neutral_temps_title, summary = R.string.set_neutral_temps_summary))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = MedtronicBooleanPreferenceKey.LogInsulinChange, title = R.string.log_insulin_change_title, summary = R.string.log_insulin_change_summary))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = MedtronicBooleanPreferenceKey.LogBatteryChange, title = R.string.log_battery_change_title, summary = R.string.log_battery_change_summary))
         }
     }
 

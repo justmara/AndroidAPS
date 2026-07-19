@@ -303,4 +303,11 @@
     <!--    Automations-->
     <color name="actionColor">#FF8B00</color>
 
+    <!-- AutoISF intermediate factor graphs -->
+    <color name="acceIsfColor">#0066FF</color>
+    <color name="bgIsfColor">#FF0000</color>
+    <color name="ppIsfColor">#00FF00</color>
+    <color name="duraIsfColor">#FF8800</color>
+    <color name="finalIsfColor">#00FFFF</color>
+    <color name="iobThColor">#BBFFFF</color>
 </resources>

@@ -1,19 +1,26 @@
 package app.aaps
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Intent
+import android.content.Context
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.net.ConnectivityManager
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.RM
 import app.aaps.core.data.model.TE
+import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.data.ue.ValueWithUnit
@@ -24,6 +31,7 @@ import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.logging.LoggerUtils
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.resources.ResourceHelper
@@ -36,6 +44,7 @@ import app.aaps.core.interfaces.versionChecker.VersionCheckerUtils
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.LongComposedKey
+import app.aaps.core.keys.LongKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.Preferences
@@ -48,6 +57,12 @@ import app.aaps.di.DaggerAppComponent
 import app.aaps.implementation.lifecycle.ProcessLifecycleListener
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.implementation.receivers.NetworkChangeReceiver
+import app.aaps.plugins.aps.openAPSAutoISF.OpenAPSAutoISFPlugin
+import app.aaps.plugins.aps.openAPSBoost.OpenAPSBoostPlugin
+import app.aaps.plugins.aps.openAPSBoost.StepService
+import app.aaps.plugins.aps.openAPSBoostV2.OpenAPSBoostV2Plugin
+import app.aaps.plugins.aps.openAPSSMB.PhoneMovementDetector
+import app.aaps.plugins.aps.openAPSSMB.StepService as AutoIsfStepService
 import app.aaps.plugins.configuration.keys.ConfigurationBooleanComposedKey
 import app.aaps.plugins.constraints.objectives.keys.ObjectivesLongComposedKey
 import app.aaps.plugins.main.general.themes.ThemeSwitcherPlugin
@@ -59,6 +74,7 @@ import app.aaps.receivers.ChargingStateReceiver
 import app.aaps.receivers.KeepAliveWorker
 import app.aaps.receivers.TimeDateOrTZChangeReceiver
 import app.aaps.ui.activityMonitor.ActivityMonitor
+import app.aaps.plugins.main.general.overview.boost.widget.BoostWidget
 import app.aaps.ui.widget.Widget
 import app.aaps.utils.configureLeakCanary
 import com.google.firebase.Firebase
@@ -104,6 +120,7 @@ class MainApp : DaggerApplication() {
     @Inject lateinit var themeSwitcherPlugin: ThemeSwitcherPlugin
     @Inject lateinit var localAlertUtils: LocalAlertUtils
     @Inject lateinit var rh: Provider<ResourceHelper>
+    @Inject lateinit var loggerUtils: LoggerUtils
     @Inject lateinit var loop: Loop
     @Inject lateinit var profileFunction: ProfileFunction
     @Inject lateinit var fabricPrivacy: FabricPrivacy
@@ -117,6 +134,7 @@ class MainApp : DaggerApplication() {
         super.onCreate()
 
         // Here should be everything injected
+        loggerUtils.initialize(this)
         aapsLogger.debug("onCreate")
         ProcessLifecycleOwner.get().lifecycle.addObserver(processLifecycleListener.get())
         // Configure LeakCanary with Firebase reporting
@@ -189,10 +207,65 @@ class MainApp : DaggerApplication() {
         refreshWidget = Runnable {
             handler.postDelayed(refreshWidget, 60000)
             Widget.updateWidget(this@MainApp, "ScheduleEveryMin")
+            BoostWidget.updateWidget(this@MainApp, "ScheduleEveryMin")
         }
         handler.postDelayed(refreshWidget, 60000)
         config.appInitialized = true
+
+        // Record app start (used by AutoISF time-since-start) and register activity sensors
+        // for the active APS plugin only — see registerActivitySensors().
+        preferences.put(LongKey.AppStart, dateUtil.now())
+        try {
+            registerActivitySensors()
+        } catch (e: Exception) {
+            aapsLogger.error(LTag.APS, "Failed to register activity sensors", e)
+        }
+
         aapsLogger.debug("doInit end")
+    }
+
+    /**
+     * Registers activity sensors (hardware step counter + phone-movement detection) used by the
+     * activity-aware APS plugins. Only the sensors needed by the *currently enabled* APS plugin are
+     * registered — AAPS runs exactly one APS plugin, so an SMB/AMA user pays no sensor cost.
+     *
+     * Battery notes:
+     *  - Step counter is registered with a 2-min FIFO batch (maxReportLatency) so the CPU can stay
+     *    asleep between deliveries; Boost/AutoISF only need 5-min resolution.
+     *  - Movement detection uses the accelerometer sampled at 1 Hz with a 2-min FIFO batch (CPU
+     *    sleeps between flushes; no ACTIVITY_RECOGNITION permission needed), falling back to the
+     *    hardware significant-motion trigger on devices without an accelerometer — see
+     *    [PhoneMovementDetector].
+     */
+    private fun registerActivitySensors() {
+        val activeAps = plugins.firstOrNull { it.getType() == PluginType.APS && it.isEnabled() }
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+
+        // Step counter — consumed by Boost (V1/V2) and AutoISF. Needs ACTIVITY_RECOGNITION on Q+.
+        val usesStepCounter = activeAps is OpenAPSBoostPlugin || activeAps is OpenAPSBoostV2Plugin || activeAps is OpenAPSAutoISFPlugin
+        if (usesStepCounter) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED
+            ) {
+                aapsLogger.warn(LTag.APS, "ACTIVITY_RECOGNITION not granted — step counter disabled until granted and app restarted")
+            } else {
+                val stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+                if (stepSensor == null) {
+                    aapsLogger.warn(LTag.APS, "Step counter sensor not available on this device")
+                } else {
+                    val maxReportLatencyUs = 2 * 60 * 1000 * 1000 // 2 min FIFO batch, well below the 5-min bucket
+                    val listener = if (activeAps is OpenAPSAutoISFPlugin) AutoIsfStepService else StepService
+                    sensorManager.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL, maxReportLatencyUs)
+                    aapsLogger.debug(LTag.APS, "Step counter registered for ${activeAps?.javaClass?.simpleName}")
+                }
+            }
+        }
+
+        // Phone-movement detection — consumed by AutoISF only.
+        if (activeAps is OpenAPSAutoISFPlugin) {
+            if (PhoneMovementDetector.register(sensorManager)) aapsLogger.debug(LTag.APS, "AutoISF movement detection registered")
+            else aapsLogger.warn(LTag.APS, "No movement sensor available for AutoISF")
+        }
     }
 
     private fun setRxErrorHandler() {
@@ -248,6 +321,17 @@ class MainApp : DaggerApplication() {
             val dynIsf = sp.getDouble("DynISFAdjust", 0.0)
             if (dynIsf != 0.0 && dynIsf.toInt() != preferences.get(IntKey.ApsDynIsfAdjustmentFactor))
                 preferences.put(IntKey.ApsDynIsfAdjustmentFactor, dynIsf.toInt())
+        } catch (_: Exception) { /* ignore */
+        }
+        // The Boost DynISF adjustment factor used to share the "DynISFAdjust" SP entry with the
+        // SMB/AutoISF factor (IntKey collision: one overwrote the other). The Boost key was renamed to
+        // "boost_DynISFAdjust"; carry the previously-shared value into the new key once so existing
+        // Boost users keep their setting instead of silently reverting to the default.
+        try {
+            if (preferences.getIfExists(IntKey.ApsBoostDynIsfAdjustmentFactor) == null)
+                preferences.getIfExists(IntKey.ApsDynIsfAdjustmentFactor)?.let { shared ->
+                    preferences.put(IntKey.ApsBoostDynIsfAdjustmentFactor, shared.coerceIn(1, 300))
+                }
         } catch (_: Exception) { /* ignore */
         }
         // Clear SmsOtpPassword if wrongly replaced

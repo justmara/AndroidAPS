@@ -51,7 +51,7 @@ internal fun RemoteDeviceStatus.Pump.toNSDeviceStatusPump(): NSDeviceStatus.Pump
         clock = clock,
         reservoir = reservoir,
         reservoirDisplayOverride = reservoirDisplayOverride,
-        battery = NSDeviceStatus.Pump.Battery(battery?.percent, battery?.voltage),
+        battery = NSDeviceStatus.Pump.Battery(battery?.percent, battery?.voltage, battery?.rileyLinkPercent),
         status = NSDeviceStatus.Pump.Status(status?.status, status?.timestamp),
         extended = extended?.let { JSONObject(it.toString()) }
     )
@@ -61,7 +61,7 @@ internal fun NSDeviceStatus.Pump.toRemoteDeviceStatusPump(): RemoteDeviceStatus.
         clock = clock,
         reservoir = reservoir,
         reservoirDisplayOverride = reservoirDisplayOverride,
-        battery = RemoteDeviceStatus.Pump.Battery(battery?.percent, battery?.voltage),
+        battery = RemoteDeviceStatus.Pump.Battery(battery?.percent, battery?.voltage, battery?.rileyLinkPercent),
         status = RemoteDeviceStatus.Pump.Status(status?.status, status?.timestamp),
         extended = extended?.let { JsonParser.parseString(it.toString()).asJsonObject }
     )

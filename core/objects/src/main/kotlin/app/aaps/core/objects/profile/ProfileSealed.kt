@@ -448,7 +448,9 @@ sealed class ProfileSealed(
                 if (elapsedSec != 0) sb.append("\n")
                 sb.append(dateUtil.formatHHMM(elapsedSec))
                     .append("    ")
-                    .append(format.format(it.amount * multiplier))
+                    // shiftBlock already applies the percentage multiplier to it.amount; do NOT multiply
+                    // again here (that showed raw * multiplier^2 in the schedule for percentages != 100).
+                    .append(format.format(it.amount))
                     .append(" $units")
                 elapsedSec += T.msecs(it.duration).secs().toInt()
             }

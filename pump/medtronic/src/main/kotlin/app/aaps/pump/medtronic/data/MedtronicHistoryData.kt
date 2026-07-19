@@ -33,6 +33,7 @@ import app.aaps.pump.medtronic.data.dto.TempBasalProcessDTO
 import app.aaps.pump.medtronic.defs.MedtronicDeviceType
 import app.aaps.pump.medtronic.defs.PumpBolusType
 import app.aaps.pump.medtronic.driver.MedtronicPumpStatus
+import app.aaps.pump.medtronic.keys.MedtronicBooleanPreferenceKey
 import app.aaps.pump.medtronic.keys.MedtronicLongNonKey
 import app.aaps.pump.medtronic.util.MedtronicUtil
 import com.google.gson.Gson
@@ -494,7 +495,7 @@ class MedtronicHistoryData @Inject constructor(
                 }
             }
         }
-        if (lastRewindRecord != null) {
+        if (lastRewindRecord != null && preferences.get(MedtronicBooleanPreferenceKey.LogInsulinChange)) {
             uploadCareportalEventIfFoundInHistory(
                 lastRewindRecord,
                 MedtronicLongNonKey.LastRewind,
@@ -522,7 +523,7 @@ class MedtronicHistoryData @Inject constructor(
                 }
             }
         }
-        if (lastBatteryChangeRecord != null) {
+        if (lastBatteryChangeRecord != null && preferences.get(MedtronicBooleanPreferenceKey.LogBatteryChange)) {
             uploadCareportalEventIfFoundInHistory(
                 lastBatteryChangeRecord,
                 MedtronicLongNonKey.LastBatteryChange,

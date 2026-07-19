@@ -32,6 +32,8 @@ enum class BooleanKey(
     OverviewUseBolusAdvisor("use_bolus_advisor", true, defaultedBySM = true),
     OverviewUseBolusReminder("use_bolus_reminder", true, defaultedBySM = true),
     OverviewUseSuperBolus("key_usersuperbolus", false, defaultedBySM = true, hideParentScreenIfHidden = true),
+    OverviewBasalIsAlwaysNotAbsolute("overview_basal_always_not_absolute", true),
+    OverviewRecalcOnTempTarget("recalc_on_temp_target", false),
 
     PumpBtWatchdog("bt_watchdog", false, showInNsClientMode = false, hideParentScreenIfHidden = true),
 
@@ -57,13 +59,29 @@ enum class BooleanKey(
     ApsResistanceLowersTarget("resistance_lowers_target", true, defaultedBySM = true), // change from default false
     ApsAlwaysUseShortDeltas("always_use_shortavg", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     ApsDynIsfAdjustSensitivity("dynisf_adjust_sensitivity", false, defaultedBySM = true, dependency = ApsUseDynamicSensitivity), // change from default false
+    ApsDynIsfUseProfileSens("dynisf_use_profile_sens", false, defaultedBySM = false, dependency = ApsUseDynamicSensitivity),
+    ApsDynIsfProfilePercentage("dynisf_use_profile_percentage", true, defaultedBySM = true, dependency = ApsUseDynamicSensitivity, negativeDependency = ApsDynIsfUseProfileSens),
+    ApsUseDynamicCarbRatio("use_dynamic_carb_ratio", false),
+    ApsDynamicCrUseCustomPeakTime("dynamic_cr_use_custom_peak_time", false, dependency = ApsUseDynamicCarbRatio),
+    ApsAutoCr("auto_cr", false, negativeDependency = ApsUseDynamicCarbRatio),
     ApsAmaAutosensAdjustTargets("autosens_adjust_targets", true, defaultedBySM = true),
     ApsAutoIsfHighTtRaisesSens("high_temptarget_raises_sensitivity", false, defaultedBySM = true),
     ApsAutoIsfLowTtLowersSens("low_temptarget_lowers_sensitivity", false, defaultedBySM = true),
     ApsUseAutoIsfWeights("openapsama_enable_autoISF", false, defaultedBySM = true),
     ApsAutoIsfSmbOnEvenTarget("Enable alternative activation of SMB always", false, defaultedBySM = true),   // profile target
+    ApsAutoIsfExerciseMode("aisf_exercise_mode", false),
 
-    MaintenanceEnableFabric("enable_fabric2", true, defaultedBySM = true, hideParentScreenIfHidden = true),
+    // AutoISF 3.2.0 - activity detection & FSL calibration
+    ApsActivityDetection("activity_detection", false, defaultedBySM = true),
+    ActivityMonitorDetection("activity_detection", false, defaultedBySM = true),
+    ActivityMonitorOvernight("ignore_inactivity_overnight", true, defaultedBySM = true, dependency = ActivityMonitorDetection),
+    ActivityMonitorStepsActive("steps_activity_detected", false, defaultedBySM = true),
+    ActivityMonitorStepsInactive("steps_inactivity_detected", false, defaultedBySM = true),
+    ActivityMonitorShowStepsFromSmartphone("steps_graph_from_smartphone", true, defaultedBySM = true),
+    FslCalibrationTrigger("calibration_stops_SMB", false, defaultedBySM = true),
+    FslCalibrationEnd("calibration_end", false, defaultedBySM = true),
+
+    MaintenanceEnableFabric("enable_fabric2", false, defaultedBySM = true, hideParentScreenIfHidden = true),
 
     MaintenanceEnableExportSettingsAutomation("enable_unattended_export", false, defaultedBySM = false),
 
@@ -75,6 +93,10 @@ enum class BooleanKey(
 
     SmsAllowRemoteCommands("smscommunicator_remotecommandsallowed", false),
     SmsReportPumpUnreachable("smscommunicator_report_pump_unreachable", true),
+    SmsReportProfileSwitch("smscommunicator_report_profile_switch", true),
+    SmsAddPumpStatus("smscommunicator_add_pump_status", false, dependency = SmsAllowRemoteCommands),
+    SmsEnableOtp("smscommunicator_enable_otp", true, dependency = SmsAllowRemoteCommands),
+    SmsReportToAll("smscommunicator_report_to_all", true, dependency = SmsAllowRemoteCommands),
 
     VirtualPumpStatusUpload("virtualpump_uploadstatus", false, showInNsClientMode = false),
     NsClientUploadData("ns_upload", true, showInNsClientMode = false, hideParentScreenIfHidden = true),
@@ -99,6 +121,7 @@ enum class BooleanKey(
     NsClientCreateAnnouncementsFromCarbsReq("ns_create_announcements_from_carbs_req", false, calculatedDefaultValue = true, showInNsClientMode = false),
     NsClientSlowSync("ns_sync_slow", false),
     NsClient3UseWs("ns_use_ws", true),
+    NsClient3IgnoreErrors("ns_ignore_errors", false),
     OpenHumansWifiOnly("oh_wifi_only", true),
     OpenHumansChargingOnly("oh_charging_only", false),
     XdripSendStatus("xdrip_send_status", false),
@@ -110,9 +133,11 @@ enum class BooleanKey(
     WearWizardTrend(key = "wearwizard_trend", defaultValue = false, dependency = WearControl, hideParentScreenIfHidden = true),
     WearWizardCob(key = "wearwizard_cob", defaultValue = true, dependency = WearControl, hideParentScreenIfHidden = true),
     WearWizardIob(key = "wearwizard_iob", defaultValue = true, dependency = WearControl, hideParentScreenIfHidden = true),
+    WearWizardAlarm("wearwizard_alarm", true, dependency = WearControl, hideParentScreenIfHidden = true),
     WearCustomWatchfaceAuthorization(key = "wear_custom_watchface_autorization", defaultValue = false),
     WearNotifyOnSmb(key = "wear_notifySMB", defaultValue = true),
     WearBroadcastData(key = "wear_broadcast_data", defaultValue = false),
+
     WizardCalculationVisible("wizard_calculation_visible", defaultValue = false),
     WizardCorrectionPercent("wizard_correction_percent", defaultValue = false),
     WizardIncludeCob("wizard_include_cob", defaultValue = false),
@@ -120,18 +145,47 @@ enum class BooleanKey(
     SiteRotationManagePump("site_rotation_manage_pump", defaultValue = false),
     SiteRotationManageCgm("site_rotation_manage_cgm", defaultValue = false),
 
-    // Export destination settings
-    ExportAllCloudEnabled("export_all_cloud_enabled", defaultValue = false),
-    ExportLogEmailEnabled("export_log_email_enabled", defaultValue = true),
-    ExportLogCloudEnabled("export_log_cloud_enabled", defaultValue = false),
-    ExportSettingsLocalEnabled("export_settings_local_enabled", defaultValue = true),
-    ExportSettingsCloudEnabled("export_settings_cloud_enabled", defaultValue = false),
-    ExportCsvLocalEnabled("export_csv_local_enabled", defaultValue = true),
-    ExportCsvCloudEnabled("export_csv_cloud_enabled", defaultValue = false),
+    AlwaysPromoteAdvancedFiltering("always_promote_advanced_filtering", false),
+    DisableUpdatesChecker("skip_updates_check", false, defaultedBySM = false),
+    EngineeringMode("force_engineering_mode", false, defaultedBySM = false),
+    NightMode("night_mode", false),
+    NightModeWithCOB("night_mode_cob", true, dependency = NightMode),
+    NightModeLowTT("night_mode_low_tt", true, dependency = NightMode),
+    AllowRecalculatedBGs("allow_recalc_bgs", false),
+    LyumjevU200("lyumjev_u200", false),
+    EnableSmbBgThreshold("enable_smb_bg_threshold", false),
 
     // Eating Now
     EatingNow_IgnoreCOB("IgnoreCOB", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     EatingNow_UseISFscaler("UseISFscaler", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     EatingNow_AutoStart("AutostartEN", false, defaultedBySM = true, hideParentScreenIfHidden = true),
-    EatingNow_AllowUAMplusNoENW("EatingNow_AllowUAMplusNoENW", false, defaultedBySM = true, hideParentScreenIfHidden = true)
+    EatingNow_AllowUAMplusNoENW("EatingNow_AllowUAMplusNoENW", false, defaultedBySM = true, hideParentScreenIfHidden = true),
+
+    // Boost
+    OverviewUseBoostOverview("use_boost_overview", false, defaultedBySM = true),
+    OverviewUseBoostOverviewV2("use_boost_overview_v2", false, defaultedBySM = true),
+    OverviewAlwaysUsePhoneSteps("overview_always_phone_steps", false),
+    ApsBoostEnablePercentScale("enableBoostPercentScale", false, defaultedBySM = true),
+    ApsBoostEnableCircadianIsf("enableCircadianISF", false, defaultedBySM = true),
+    ApsBoostAllowWithHighTt("enableBoost_with_high_temptarget", false, defaultedBySM = true),
+    ApsBoostUseTdd("boost_use_tdd", false, defaultedBySM = true),
+    ApsBoostAdjustSensitivity("boost_adjust_sensitivity", false, defaultedBySM = true),
+    ApsBoostAllowAllBgSources("boost_allow_all_bg_sources", true, defaultedBySM = true),
+    ApsBoostNightModeEnabled("boost_night_mode_enabled", false, defaultedBySM = true),
+    ApsBoostNightModeDisableWithCob("boost_night_mode_disable_with_cob", false, defaultedBySM = true),
+    ApsBoostNightModeDisableWithLowTt("boost_night_mode_disable_with_low_tt", false, defaultedBySM = true),
+    ApsBoostBypassVersionCheck("boost_bypass_version_check", true, defaultedBySM = true),
+    ApsBoostPostExerciseRecoveryEnabled("boost_post_exercise_recovery_enabled", false, defaultedBySM = true),
+    ApsBoostHrIntegrationEnabled("boost_hr_integration_enabled", false, defaultedBySM = true),
+    ApsBoostHrStressDetection("boost_hr_stress_detection", false, defaultedBySM = true),
+
+    // Boost V5/V6 (ported from boost_v6)
+    ApsBoostNightModeAutoBySleep("boost_night_mode_auto_by_sleep", false, defaultedBySM = true),
+    ApsBoostHealthConnectHrEnabled("boost_health_connect_hr_enabled", false, defaultedBySM = true),
+    ApsBoostV5ActiveDosing("boost_v5_active_dosing", false, defaultedBySM = true),
+    ApsBoostV6PreMealTarget("boost_v6_pre_meal_target", false, defaultedBySM = true),
+    ApsBoostV5FastCarbConfirm("boost_v5_fast_carb_confirm", true, defaultedBySM = true),
+    ApsBoostV5AutoConfigDone("boost_v5_autoconfig_done", false, defaultedBySM = true),
+    ApsBoostActivityShadowEnabled("boost_activity_shadow_enabled", true, defaultedBySM = true),
+    ApsBoostAutosensWhenNoTdd("boost_autosens_when_no_tdd", false, defaultedBySM = true),
 }

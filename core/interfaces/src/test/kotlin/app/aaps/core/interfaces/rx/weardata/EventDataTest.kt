@@ -76,7 +76,7 @@ class EventDataTest {
             assertThat(EventData.deserializeByte(it.serializeByte())).isEqualTo(it)
             assertThat(EventData.deserialize(it.serialize())).isEqualTo(it)
         }
-        EventData.ActionWizardPreCheck(1, 2).let {
+        EventData.ActionWizardPreCheck(1, 2, 3).let {
             assertThat(EventData.deserializeByte(it.serializeByte())).isEqualTo(it)
             assertThat(EventData.deserialize(it.serialize())).isEqualTo(it)
         }

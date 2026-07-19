@@ -222,7 +222,8 @@ class ReplayApsResultsTest @Inject constructor() {
             out_units = determineBasalResult.profile.optString("out_units"),
             variable_sens = 0.0,
             insulinDivisor = 0,
-            TDD = 0.0
+            TDD = 0.0,
+            use_TDD_for_predictions = null
         )
         val meatData = MealData(
             carbs = determineBasalResult.mealData.getDouble("carbs"),
@@ -242,7 +243,8 @@ class ReplayApsResultsTest @Inject constructor() {
             microBolusAllowed = determineBasalResult.microBolusAllowed,
             currentTime = currentTime,
             flatBGsDetected = determineBasalResult.flatBGsDetected,
-            dynIsfMode = false
+            dynIsfMode = false,
+            smb_ratio = 0.5
         )
         val endKt = System.currentTimeMillis()
         ktTime += (endKt - startKt)
@@ -386,7 +388,8 @@ class ReplayApsResultsTest @Inject constructor() {
             out_units = determineBasalResult.profile.optString("out_units"),
             variable_sens = determineBasalResult.profile.getDouble("variable_sens"),
             insulinDivisor = determineBasalResult.profile.getInt("insulinDivisor"),
-            TDD = determineBasalResult.profile.getDouble("TDD")
+            TDD = determineBasalResult.profile.getDouble("TDD"),
+            use_TDD_for_predictions = true
         )
         val meatData = MealData(
             carbs = determineBasalResult.mealData.getDouble("carbs"),
@@ -407,7 +410,8 @@ class ReplayApsResultsTest @Inject constructor() {
             microBolusAllowed = determineBasalResult.microBolusAllowed,
             currentTime = currentTime,
             flatBGsDetected = determineBasalResult.flatBGsDetected,
-            dynIsfMode = true
+            dynIsfMode = true,
+            smb_ratio = 0.5
         )
         val endKt = System.currentTimeMillis()
         ktTime += (endKt - startKt)
@@ -544,7 +548,9 @@ class ReplayApsResultsTest @Inject constructor() {
             out_units = determineBasalResult.profile.optString("out_units"),
             variable_sens = 0.0,
             insulinDivisor = 0,
-            TDD = 0.0
+            TDD = 0.0,
+            variable_sens_non_TDD_based = null,
+            use_TDD_for_predictions = null
         )
         val mealData = MealData(
             carbs = determineBasalResult.mealData.getDouble("carbs"),

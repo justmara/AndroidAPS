@@ -54,7 +54,9 @@ class Converters {
     fun fromTrendArrow(trendArrow: GlucoseValue.TrendArrow?) = trendArrow?.name
 
     @TypeConverter
-    fun toTrendArrow(trendArrow: String?) = trendArrow?.let { GlucoseValue.TrendArrow.valueOf(it) }
+    fun toTrendArrow(trendArrow: String?) = trendArrow?.let {
+        try { GlucoseValue.TrendArrow.valueOf(it) } catch (_: IllegalArgumentException) { GlucoseValue.TrendArrow.NONE }
+    }
 
     @TypeConverter
     fun fromSourceSensor(sourceSensor: GlucoseValue.SourceSensor?) = sourceSensor?.name
@@ -82,19 +84,25 @@ class Converters {
     fun fromTherapyEventType(therapyEventType: TherapyEvent.Type?) = therapyEventType?.name
 
     @TypeConverter
-    fun toTherapyEventType(therapyEventType: String?) = therapyEventType?.let { TherapyEvent.Type.valueOf(it) }
+    fun toTherapyEventType(therapyEventType: String?) = therapyEventType?.let {
+        try { TherapyEvent.Type.valueOf(it) } catch (_: IllegalArgumentException) { TherapyEvent.Type.NONE }
+    }
 
     @TypeConverter
     fun fromTherapyEventLocation(therapyEventLocation: TherapyEvent.Location?) = therapyEventLocation?.name
 
     @TypeConverter
-    fun toTherapyEventLocation(therapyEventLocation: String?): TherapyEvent.Location? = therapyEventLocation?.let { TherapyEvent.Location.valueOf(it) }
+    fun toTherapyEventLocation(therapyEventLocation: String?): TherapyEvent.Location? = therapyEventLocation?.let {
+        try { TherapyEvent.Location.valueOf(it) } catch (_: IllegalArgumentException) { TherapyEvent.Location.NONE }
+    }
 
     @TypeConverter
     fun fromTherapyEventArrow(therapyEventArrow: TherapyEvent.Arrow?) = therapyEventArrow?.name
 
     @TypeConverter
-    fun toTherapyEventArrow(therapyEventArrow: String?): TherapyEvent.Arrow? = therapyEventArrow?.let { TherapyEvent.Arrow.valueOf(it) }
+    fun toTherapyEventArrow(therapyEventArrow: String?): TherapyEvent.Arrow? = therapyEventArrow?.let {
+        try { TherapyEvent.Arrow.valueOf(it) } catch (_: IllegalArgumentException) { TherapyEvent.Arrow.NONE }
+    }
 
     @TypeConverter
     fun fromGlucoseType(meterType: TherapyEvent.MeterType?) = meterType?.name
@@ -118,7 +126,9 @@ class Converters {
     fun fromAlgorithm(algorithm: APSResult.Algorithm?) = algorithm?.name
 
     @TypeConverter
-    fun toAlgorithm(algorithm: String?) = algorithm?.let { APSResult.Algorithm.valueOf(it) }
+    fun toAlgorithm(algorithm: String?) = algorithm?.let {
+        try { APSResult.Algorithm.valueOf(it) } catch (_: IllegalArgumentException) { APSResult.Algorithm.UNKNOWN }
+    }
 
     @TypeConverter
     fun fromListOfBlocks(blocks: List<Block>?): String? {

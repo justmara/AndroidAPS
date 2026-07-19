@@ -77,7 +77,12 @@ class GoogleDriveManager @Inject constructor(
     private var authCodeReceived: String? = null
     private var authState: String? = null
     private var serverJob: Job? = null
-    
+
+    // Owns the OAuth local-server coroutines. Reused instead of a throwaway CoroutineScope(...) per
+    // callback (which leaked an uncancellable Job each time). This manager is @Singleton, so the scope
+    // lives for the app lifetime.
+    private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /**
      * Check if there is a valid refresh token
      */
@@ -654,7 +659,7 @@ class GoogleDriveManager @Inject constructor(
             localServer?.soTimeout = 1000  // Set timeout to avoid permanent blocking
             
             // Start server to handle requests
-            serverJob = CoroutineScope(Dispatchers.IO).launch {
+            serverJob = managerScope.launch {
                 try {
                     aapsLogger.debug(LTag.CORE, "$LOG_PREFIX Local OAuth server started on port $REDIRECT_PORT")
 
@@ -778,8 +783,8 @@ class GoogleDriveManager @Inject constructor(
             aapsLogger.error(LTag.CORE, "$LOG_PREFIX Error handling OAuth callback", e)
             sendHttpResponse(output, 500, "Internal server error")
         } finally {
-            // Delay closing server
-            CoroutineScope(Dispatchers.IO).launch {
+            // Delay closing server (on the owned scope, not a throwaway CoroutineScope per callback)
+            managerScope.launch {
                 delay(2000) // Wait 2 seconds for response to complete
                 stopLocalServer()
             }

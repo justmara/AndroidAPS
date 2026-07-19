@@ -145,6 +145,34 @@
                     android:paddingEnd="10dp"
                     android:text="@string/openloop" />
 
+                <!-- Shown only on AAPSClient followers (config.APS == false), replacing LGS/Open loop.
+                     Same icon and labels as the master's disconnect buttons. -->
+                <app.aaps.core.ui.elements.SingleClickButton
+                    android:id="@+id/overview_disconnect_30m_top"
+                    style="@style/ButtonSmallFontStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="fill_parent"
+                    android:layout_gravity="center"
+                    android:layout_marginEnd="@dimen/gray_material_button_margin_horizontal"
+                    android:layout_weight="0.5"
+                    android:drawableTop="@drawable/ic_loop_disconnected"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/duration30m" />
+
+                <app.aaps.core.ui.elements.SingleClickButton
+                    android:id="@+id/overview_disconnect_1h_top"
+                    style="@style/ButtonSmallFontStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="fill_parent"
+                    android:layout_gravity="center"
+                    android:layout_marginEnd="@dimen/gray_material_button_margin_horizontal"
+                    android:layout_weight="0.5"
+                    android:drawableTop="@drawable/ic_loop_disconnected"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/duration1h" />
+
                 <app.aaps.core.ui.elements.SingleClickButton
                     android:id="@+id/overview_disable"
                     style="@style/ButtonSmallFontStyle"
@@ -205,6 +233,18 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:orientation="horizontal">
+
+                <app.aaps.core.ui.elements.SingleClickButton
+                    android:id="@+id/overview_suspend_15m"
+                    style="@style/ButtonSmallFontStyle"
+                    android:layout_width="0px"
+                    android:layout_height="fill_parent"
+                    android:layout_marginEnd="@dimen/gray_material_button_margin_horizontal"
+                    android:layout_weight="0.5"
+                    android:drawableTop="@drawable/ic_loop_paused"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp"
+                    android:text="@string/duration15m" />
 
                 <app.aaps.core.ui.elements.SingleClickButton
                     android:id="@+id/overview_suspend_1h"

@@ -18,6 +18,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.TextView
@@ -30,6 +31,7 @@ import app.aaps.core.data.model.TT
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
+import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.graph.data.GraphViewWithCleanup
 import app.aaps.core.interfaces.aps.IobTotal
 import app.aaps.core.interfaces.aps.Loop
@@ -114,6 +116,7 @@ import app.aaps.plugins.main.general.overview.ui.StatusLightHandler
 import app.aaps.plugins.main.skins.SkinProvider
 import com.jjoe64.graphview.GraphView
 import dagger.android.support.DaggerFragment
+import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
 import java.util.Locale
@@ -164,6 +167,16 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
     @Inject lateinit var commandQueue: CommandQueue
 
     private val disposable = CompositeDisposable()
+
+    // Subscriptions that stay alive while the tab is in the background (not cleared in onPause).
+    private val backgroundDisposable = CompositeDisposable()
+
+    // Set when relevant overview data changes while this tab is in the background (paused).
+    // onResume() runs the full refreshAll() (graph redraw) only when this is true, which avoids
+    // the visible redraw/flicker of the graph numbers on every tab switch when nothing changed.
+    // Starts true so the very first onResume performs the initial draw.
+    // Volatile: written from background-bus threads (io scheduler) and read on the main thread.
+    @Volatile private var refreshNeeded = true
 
     private var smallWidth = false
     private var smallHeight = false
@@ -247,6 +260,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
 
         binding.activeProfile.setOnClickListener(this)
         binding.activeProfile.setOnLongClickListener(this)
+        binding.exerciseMode.setOnClickListener(this)
         binding.tempTarget.setOnClickListener(this)
         binding.tempTarget.setOnLongClickListener(this)
         binding.pumpStatusLayout.setOnClickListener(this)
@@ -262,6 +276,37 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         binding.buttonsLayout.quickWizardButton.setOnLongClickListener(this)
         binding.infoLayout.apsMode.setOnClickListener(this)
         binding.infoLayout.apsMode.setOnLongClickListener(this)
+
+        // Track data changes that arrive while this tab is in the background (paused) so that
+        // onResume() can redraw only when something actually changed. While the tab is the active
+        // (resumed) one, these events are already handled live by the subscriptions in onResume(),
+        // so we only mark "dirty" when not resumed. This avoids the full graph redraw (visible
+        // flicker of the graph numbers) on every tab switch back to НАЧАЛО.
+        val overviewBus = activePlugin.activeOverview.overviewBus
+        fun markDirtyWhenPaused(observable: Observable<*>) {
+            backgroundDisposable += observable
+                .observeOn(aapsSchedulers.io)
+                .subscribe({ if (!isResumed) refreshNeeded = true }, fabricPrivacy::logException)
+        }
+        // Keep this list in parity with the data-driven subscriptions in onResume(): every event
+        // whose handler is not already called unconditionally in onResume() (updatePumpStatus /
+        // updateCalcProgress) must mark the overview dirty, otherwise a change arriving while the
+        // tab is in the background would be missed until the next event or the 60s refresh loop.
+        markDirtyWhenPaused(overviewBus.toObservable(EventUpdateOverviewGraph::class.java))
+        markDirtyWhenPaused(overviewBus.toObservable(EventUpdateOverviewIobCob::class.java))
+        markDirtyWhenPaused(overviewBus.toObservable(EventUpdateOverviewSensitivity::class.java))
+        markDirtyWhenPaused(overviewBus.toObservable(EventUpdateOverviewNotification::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventBucketedDataCreated::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventRefreshOverview::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventAcceptOpenLoopChange::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventNewOpenLoopNotification::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventInitializationChanged::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventTempBasalChange::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventTempTargetChange::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventExtendedBolusChange::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventEffectiveProfileSwitchChanged::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventRunningModeChange::class.java))
+        markDirtyWhenPaused(rxBus.toObservable(EventPreferenceChange::class.java))
     }
 
     override fun onPause() {
@@ -367,7 +412,15 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         }
         handler.postDelayed(refreshLoop, 60 * 1000L)
 
-        handler.post { refreshAll() }
+        // Redraw only if data changed while the tab was in the background; otherwise the existing
+        // drawing (kept alive by ViewPager) is still current and we avoid the graph flicker.
+        if (refreshNeeded) {
+            refreshNeeded = false
+            handler.post { refreshAll() }
+        } else {
+            // Data unchanged → skip the full graph redraw, but keep the clock/status lights current.
+            updateTime()
+        }
         updatePumpStatus()
         updateCalcProgress()
 
@@ -391,25 +444,59 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         processAps()
         updateProfile()
         updateTemporaryTarget()
+        updateExerciseMode()
     }
 
     @Synchronized
     override fun onDestroyView() {
         super.onDestroyView()
-        // Remove listeners and detach series to prevent memory leaks
+        backgroundDisposable.clear()
+        // Remove listeners and detach series to prevent memory leaks.
+        // removeAllSeries() alone is insufficient: OverviewDataImpl (singleton) series
+        // can retain stale GraphView → Activity references via mGraphViews.
         _binding?.graphsLayout?.bgGraph?.let { graph ->
             graph.setOnLongClickListener(null)
-            graph.removeAllSeries()
+            detachAllSeries(graph)
         }
         for (graph in secondaryGraphs) {
             graph.setOnLongClickListener(null)
-            graph.removeAllSeries()
+            detachAllSeries(graph)
         }
         _binding = null
         carbAnimation?.stop()
         carbAnimation = null
         secondaryGraphs.clear()
         secondaryGraphsLabel.clear()
+    }
+
+    /**
+     * Detach all OverviewData series from a graph to prevent
+     * OverviewDataImpl (singleton) → series.mGraphViews → GraphView → Activity leak chains.
+     */
+    private fun detachAllSeries(graph: com.jjoe64.graphview.GraphView) {
+        graph.removeAllSeries()
+        val allSeries = listOf(
+            overviewData.bucketedGraphSeries, overviewData.bgReadingGraphSeries,
+            overviewData.predictionsGraphSeries, overviewData.baseBasalGraphSeries,
+            overviewData.tempBasalGraphSeries, overviewData.basalLineGraphSeries,
+            overviewData.absoluteBasalGraphSeries, overviewData.temporaryTargetSeries,
+            overviewData.runningModesSeries, overviewData.activitySeries,
+            overviewData.activityPredictionSeries, overviewData.epsSeries,
+            overviewData.treatmentsSeries, overviewData.therapyEventSeries,
+            overviewData.iobSeries, overviewData.absIobSeries,
+            overviewData.iobPredictions1Series, overviewData.minusBgiSeries,
+            overviewData.minusBgiHistSeries, overviewData.cobSeries,
+            overviewData.cobMinFailOverSeries, overviewData.deviationsSeries,
+            overviewData.ratioSeries, overviewData.varSensSeries,
+            overviewData.acceIsfSeries, overviewData.bgIsfSeries,
+            overviewData.ppIsfSeries, overviewData.duraIsfSeries,
+            overviewData.finalIsfSeries, overviewData.iobThSeries,
+            overviewData.dsMaxSeries, overviewData.dsMinSeries,
+            overviewData.heartRateGraphSeries, overviewData.stepsCountGraphSeries
+        )
+        for (s in allSeries) {
+            (s as? com.jjoe64.graphview.series.Series<*>)?.onGraphViewDetached(graph)
+        }
     }
 
     override fun onDestroy() {
@@ -445,6 +532,11 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                     ProtectionCheck.Protection.BOLUS,
                     UIRunnable { if (isAdded) uiInteraction.runCarbsDialog(childFragmentManager) })
 
+                R.id.temp_target         -> protectionCheck.queryProtection(
+                    activity,
+                    ProtectionCheck.Protection.BOLUS,
+                    UIRunnable { if (isAdded) uiInteraction.runTempTargetDialog(childFragmentManager) })
+
                 R.id.en_button           -> protectionCheck.queryProtection(
                     activity,
                     ProtectionCheck.Protection.BOLUS,
@@ -454,6 +546,15 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                     activity,
                     ProtectionCheck.Protection.BOLUS,
                     UIRunnable { if (isAdded) uiInteraction.runTempTargetDialog(childFragmentManager) })
+
+                R.id.exercise_mode         -> protectionCheck.queryProtection(
+                    activity,
+                    ProtectionCheck.Protection.BOLUS,
+                    UIRunnable { if (isAdded) {
+                        val state = !preferences.get(BooleanKey.ApsAutoIsfExerciseMode)
+                        preferences.put(BooleanKey.ApsAutoIsfExerciseMode, state)
+                        updateExerciseMode()
+                    } })
 
                 R.id.active_profile      -> {
                     uiInteraction.runProfileViewerDialog(
@@ -611,7 +712,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             _binding ?: return@runOnUiThread
             if (resultAvailable && pump.isInitialized() && loop.runningMode == RM.Mode.OPEN_LOOP && (loop as PluginBase).isEnabled()) {
                 binding.buttonsLayout.acceptTempButton.visibility = View.VISIBLE
-                binding.buttonsLayout.acceptTempButton.text = "${rh.gs(R.string.set_basal_question)}\n${lastRun.constraintsProcessed?.resultAsString()}"
+                binding.buttonsLayout.acceptTempButton.text = "${rh.gs(R.string.set_basal_question)}\n${lastRun?.constraintsProcessed?.resultAsString()}"
             } else {
                 binding.buttonsLayout.acceptTempButton.visibility = View.GONE
             }
@@ -619,7 +720,6 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             // **** Various treatment buttons ****
             binding.buttonsLayout.carbsButton.visibility =
                 (profile != null && preferences.get(BooleanKey.OverviewShowCarbsButton)).toVisibility()
-            binding.buttonsLayout.enButton.visibility = (profile != null && config.APS).toVisibility()
             binding.buttonsLayout.treatmentButton.visibility = (loop.runningMode != RM.Mode.DISCONNECTED_PUMP && !pump.isSuspended() && pump.isInitialized() && profile != null
                 && preferences.get(BooleanKey.OverviewShowTreatmentButton)).toVisibility()
             binding.buttonsLayout.wizardButton.visibility = (loop.runningMode != RM.Mode.DISCONNECTED_PUMP && !pump.isSuspended() && pump.isInitialized() && profile != null
@@ -697,6 +797,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                         list += event.hashCode()
                     }
             binding.buttonsLayout.userButtonsLayout.visibility = events.isNotEmpty().toVisibility()
+            binding.exerciseModeCard.visibility = (activePlugin.activeAPS.algorithm == APSResult.Algorithm.AUTO_ISF).toVisibility()
         }
         if (list != lastUserAction) {
             // Synchronize Watch Tiles with overview
@@ -860,6 +961,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         val trendDescription = trendCalculator.getTrendDescription(iobCobCalculator.ads)
         val trendArrow = trendCalculator.getTrendArrow(iobCobCalculator.ads)
         val lastBgDescription = lastBgData.lastBgDescription()
+        val isAutoISF = activePlugin.activeAPS.algorithm == APSResult.Algorithm.AUTO_ISF
         runOnUiThread {
             _binding ?: return@runOnUiThread
             binding.infoLayout.bg.text = profileUtil.fromMgdlToStringInUnits(lastBg?.recalculated)
@@ -875,12 +977,16 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                 binding.infoLayout.delta.text = profileUtil.fromMgdlToSignedStringInUnits(glucoseStatus.delta)
                 binding.infoLayout.avgDelta.text = profileUtil.fromMgdlToSignedStringInUnits(glucoseStatus.shortAvgDelta)
                 binding.infoLayout.longAvgDelta.text = profileUtil.fromMgdlToSignedStringInUnits(glucoseStatus.longAvgDelta)
+                binding.infoLayout.bgAccel.text = String.format(Locale.ENGLISH, "%.1f", glucoseStatus.bgAcceleration)
             } else {
                 binding.infoLayout.deltaLarge.text = ""
                 binding.infoLayout.delta.text = "Δ " + rh.gs(app.aaps.core.ui.R.string.value_unavailable_short)
                 binding.infoLayout.avgDelta.text = ""
                 binding.infoLayout.longAvgDelta.text = ""
+                binding.infoLayout.bgAccel.text = ""
             }
+
+            binding.infoLayout.bgAccelRow.visibility = isAutoISF.toVisibility()
 
             // strike through if BG is old
             binding.infoLayout.bg.paintFlags =
@@ -1101,6 +1207,8 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         graphData.addEps(context, 0.95)
         if (menuChartSettings[0][OverviewMenus.CharType.TREAT.ordinal])
             graphData.addTherapyEvents()
+        if (menuChartSettings[0][OverviewMenus.CharType.PROFILE_CHANGE.ordinal])
+            graphData.addProfileChangeEvents()
         if (menuChartSettings[0][OverviewMenus.CharType.ACT.ordinal])
             graphData.addActivity(0.8)
         if ((pump.pumpDescription.isTempBasalCapable || config.AAPSCLIENT) && menuChartSettings[0][OverviewMenus.CharType.BAS.ordinal])
@@ -1132,6 +1240,12 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             var useBGIForScale = false
             var useHRForScale = false
             var useSTEPSForScale = false
+            var useAcceIsfForScale = false
+            var useBgIsfForScale = false
+            var usePpIsfForScale = false
+            var useDuraIsfForScale = false
+            var useFinalIsfForScale = false
+            var useIobThForScale = false
             when {
                 menuChartSettings[g + 1][OverviewMenus.CharType.ABS.ordinal]      -> useABSForScale = true
                 menuChartSettings[g + 1][OverviewMenus.CharType.IOB.ordinal]      -> useIobForScale = true
@@ -1143,8 +1257,26 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                 menuChartSettings[g + 1][OverviewMenus.CharType.DEVSLOPE.ordinal] -> useDSForScale = true
                 menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal]       -> useHRForScale = true
                 menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal]    -> useSTEPSForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal] -> useAcceIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal]   -> useBgIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal]   -> usePpIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal] -> useDuraIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal]-> useFinalIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal]   -> useIobThForScale = true
             }
             val alignDevBgiScale = menuChartSettings[g + 1][OverviewMenus.CharType.DEV.ordinal] && menuChartSettings[g + 1][OverviewMenus.CharType.BGI.ordinal]
+            // AutoISF factor graphs: when 2+ are on the same sub-graph, share one 1.0-centred axis (maxAutoIsfFactor)
+            var maxAutoIsfFactor = 1.0
+            var commonIsfCount = 0
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, overviewData.maxFinalIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, overviewData.maxAcceIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, overviewData.maxBgIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, overviewData.maxPpIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, overviewData.maxDuraIsfValueFound); commonIsfCount++ }
+            val useCommonISFForScale = commonIsfCount > 1
+            val maxCommonIob = if (menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal] &&
+                (menuChartSettings[g + 1][OverviewMenus.CharType.IOB.ordinal] || menuChartSettings[g + 1][OverviewMenus.CharType.ABS.ordinal])
+            ) maxOf(overviewData.maxIobValueFound, overviewData.maxIobThValueFound) else 0.0
 
             if (menuChartSettings[g + 1][OverviewMenus.CharType.ABS.ordinal]) secondGraphData.addAbsIob(useABSForScale, 1.0)
             if (menuChartSettings[g + 1][OverviewMenus.CharType.IOB.ordinal]) secondGraphData.addIob(useIobForScale, 1.0)
@@ -1160,6 +1292,12 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
             )
             if (menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal]) secondGraphData.addHeartRate(useHRForScale, if (useHRForScale) 1.0 else 0.8)
             if (menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal]) secondGraphData.addSteps(useSTEPSForScale, if (useSTEPSForScale) 1.0 else 0.8)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal]) secondGraphData.addAcceIsf(useAcceIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal]) secondGraphData.addBgIsf(useBgIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal]) secondGraphData.addPpIsf(usePpIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal]) secondGraphData.addDuraIsf(useDuraIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal]) secondGraphData.addFinalIsf(useFinalIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal]) secondGraphData.addIobTh(useIobThForScale, if (maxCommonIob > 0.0) 1.0 else 0.8, maxCommonIob)
 
             // set manual x bounds to have nice steps
             secondGraphData.formatAxis(overviewData.fromTime, overviewData.endTime)
@@ -1178,7 +1316,13 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                     menuChartSettings[g + 1][OverviewMenus.CharType.VAR_SEN.ordinal] ||
                     menuChartSettings[g + 1][OverviewMenus.CharType.DEVSLOPE.ordinal] ||
                     menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal] ||
-                    menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal]
+                    menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal]
                 ).toVisibility()
             secondaryGraphsData[g].performUpdate()
         }
@@ -1192,85 +1336,18 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
 
     private fun updateSensitivity() {
         _binding ?: return
-        val lastAutosensData = iobCobCalculator.ads.getLastAutosensData("Overview", aapsLogger, dateUtil)
-        val lastAutosensRatio = lastAutosensData?.let { it.autosensResult.ratio * 100 }
-        if (config.AAPSCLIENT && preferences.get(BooleanNonKey.AutosensUsedOnMainPhone) ||
-            !config.AAPSCLIENT && constraintChecker.isAutosensModeEnabled().value()
-        ) {
-            binding.infoLayout.sensitivityIcon.setImageResource(
-                lastAutosensRatio?.let {
-                    when {
-                        it > 100.0 -> app.aaps.core.objects.R.drawable.ic_as_above
-                        it < 100.0 -> app.aaps.core.objects.R.drawable.ic_as_below
-                        else       -> app.aaps.core.objects.R.drawable.ic_swap_vert_black_48dp_green
-                    }
+        val text = overviewData.sensitivityText(true, loop, iobCobCalculator)
+        binding.infoLayout.sensitivity.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
+        binding.infoLayout.sensitivity.text = text
+        binding.infoLayout.sensitivityIcon.setImageResource(
+            overviewData.autoOrTddSensRatio(loop, iobCobCalculator)?.let {
+                when {
+                    it > 1.0 -> app.aaps.core.objects.R.drawable.ic_as_above
+                    it <     1.0 -> app.aaps.core.objects.R.drawable.ic_as_below
+                    else     -> app.aaps.core.objects.R.drawable.ic_swap_vert_black_48dp_green
                 }
-                    ?: app.aaps.core.objects.R.drawable.ic_swap_vert_black_48dp_green
-            )
-        } else {
-            binding.infoLayout.sensitivityIcon.setImageResource(
-                lastAutosensRatio?.let {
-                    when {
-                        it > 100.0 -> app.aaps.core.objects.R.drawable.ic_x_as_above
-                        it < 100.0 -> app.aaps.core.objects.R.drawable.ic_x_as_below
-                        else       -> app.aaps.core.objects.R.drawable.ic_x_swap_vert
-                    }
-                }
-                    ?: app.aaps.core.objects.R.drawable.ic_x_swap_vert
-            )
-        }
-
-        // Show variable sensitivity
-        val profile = profileFunction.getProfile()
-        val request = loop.lastRun?.request
-        val isfMgdl = profile?.getProfileIsfMgdl()
-        val isfForCarbs = profile?.getIsfMgdlForCarbs(dateUtil.now(), "Overview", config, processedDeviceStatusData)
-        val variableSens =
-            if (config.APS) request?.variableSens ?: 0.0
-            else if (config.AAPSCLIENT) processedDeviceStatusData.getAPSResult()?.variableSens ?: 0.0
-            else 0.0
-        val ratioUsed = request?.autosensResult?.ratio ?: 1.0
-
-        if (variableSens != isfMgdl && variableSens != 0.0 && isfMgdl != null) {
-            val okDialogText: ArrayList<String> = ArrayList()
-            val overViewText: ArrayList<String> = ArrayList()
-            val autoSensHiddenRange = 0.0             //Hide Autosens value if equals 100%
-            val autoSensMax = 100.0 + (preferences.get(DoubleKey.AutosensMax) - 1.0) * autoSensHiddenRange * 100.0
-            val autoSensMin = 100.0 + (preferences.get(DoubleKey.AutosensMin) - 1.0) * autoSensHiddenRange * 100.0
-            lastAutosensRatio?.let {
-                if (it < autoSensMin || it > autoSensMax)
-                    overViewText.add(rh.gs(app.aaps.core.ui.R.string.autosens_short, it))
-                okDialogText.add(rh.gs(app.aaps.core.ui.R.string.autosens_long, it))
-            }
-            overViewText.add(
-                String.format(
-                    Locale.getDefault(), "%1$.1f→%2$.1f",
-                    profileUtil.fromMgdlToUnits(isfMgdl, profileFunction.getUnits()),
-                    profileUtil.fromMgdlToUnits(variableSens, profileFunction.getUnits())
-                )
-            )
-            binding.infoLayout.sensitivity.text = overViewText.joinToString("\n")
-            binding.infoLayout.sensitivity.visibility = View.VISIBLE
-            binding.infoLayout.variableSensitivity.visibility = View.GONE
-            if (ratioUsed != 1.0 && ratioUsed != lastAutosensData?.autosensResult?.ratio)
-                okDialogText.add(rh.gs(app.aaps.core.ui.R.string.algorithm_long, ratioUsed * 100))
-            okDialogText.add(rh.gs(app.aaps.core.ui.R.string.isf_for_carbs, profileUtil.fromMgdlToUnits(isfForCarbs ?: 0.0, profileFunction.getUnits())))
-            if (config.APS) {
-                val aps = activePlugin.activeAPS
-                aps.getSensitivityOverviewString()?.let {
-                    okDialogText.add(it)
-                }
-            }
-            binding.infoLayout.asLayout.setOnClickListener { activity?.let { OKDialog.show(it, rh.gs(app.aaps.core.ui.R.string.sensitivity), okDialogText.joinToString("\n")) } }
-
-        } else {
-            binding.infoLayout.sensitivity.text =
-                lastAutosensData?.let {
-                    rh.gs(app.aaps.core.ui.R.string.autosens_short, it.autosensResult.ratio * 100)
-                } ?: ""
-            binding.infoLayout.variableSensitivity.visibility = View.GONE
-            binding.infoLayout.sensitivity.visibility = View.VISIBLE
-        }
+            } ?: app.aaps.core.objects.R.drawable.ic_x_swap_vert
+        )
     }
 
     private fun updatePumpStatus() {
@@ -1299,6 +1376,19 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
                     })
                 }
             }
+        }
+    }
+
+    private fun updateExerciseMode() {
+        _binding ?: return
+        val enabled = preferences.get(BooleanKey.ApsAutoIsfExerciseMode)
+        with (binding.exerciseMode) {
+            setColorFilter(rh.gac(
+                if (enabled) app.aaps.core.ui.R.attr.ribbonTextWarningColor
+                else app.aaps.core.ui.R.attr.ribbonTextDefaultColor))
+            setBackgroundColor(rh.gac(
+                if (enabled) app.aaps.core.ui.R.attr.ribbonWarningColor
+                else app.aaps.core.ui.R.attr.ribbonDefaultColor))
         }
     }
 }

@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="bolus_constraint_applied">применено ограничение болюса</string>
-    <string name="carbs_constraint_applied">применено ограничение углеводов</string>
+    <string name="bolus_constraint_applied">Применено ограничение болюса</string>
+    <string name="carbs_constraint_applied">Применено ограничение углеводов</string>
     <string name="temp_target_short">ВЦ</string>
     <string name="dialog_canceled">Диалог отменен</string>
-    <string name="start_activity_tt">Включить временную цель TT Нагрузка</string>
-    <string name="start_eating_soon_tt">Включить временную цель TT Ожидаемый прием пищи</string>
-    <string name="start_hypo_tt">Начать временную цель ТТ Гипо</string>
+    <string name="start_activity_tt">Начать ВЦ Нагрузка</string>
+    <string name="start_eating_soon_tt">Начать ВЦ Ожидаемый прием пищи</string>
+    <string name="start_hypo_tt">Начать ВЦ Гипо</string>
     <string name="time_offset">Смещение по времени</string>
     <string name="unit_minute_short">мин</string>
     <string name="remind_to_bolus_later">Напомнить о болюсе позже</string>
-    <string name="a11y_carb_reminder">установить напоминание</string>
+    <string name="a11y_carb_reminder">Установить напоминание</string>
     <!--    Widget-->
     <string name="configure">Настроить прозрачность</string>
+    <string name="configure_statuslights">Показывать статус расходников</string>
     <string name="widget_description">Виджет AAPS</string>
     <!--     Activities-->
     <string name="activity_monitor">Монитор активности</string>
@@ -84,22 +85,22 @@
     <string name="duration3h">3 часа</string>
     <string name="duration10h">10 часов</string>
     <!-- WizardDialog -->
-    <string name="a11_correction_percentage">изменить результат на %</string>
-    <string name="a11_correction_units">изменить результат на ед</string>
+    <string name="a11_correction_percentage">Изменить результат на %</string>
+    <string name="a11_correction_units">Изменить результат на ед</string>
     <string name="two_hours">2ч</string>
     <string name="result_insulin_carbs">Результат: %1$s %2$s</string>
-    <string name="missing_carbs">Не хватает %1$d г</string>
+    <string name="missing_carbs">Не хватает %1$dг</string>
     <string name="a11y_current_bg">текущий уровень глюкозы крови</string>
     <string name="carb_time_label">Время приема углеводов</string>
-    <string name="a11y_set_carb_timer">установить будильник приема углеводов</string>
+    <string name="a11y_set_carb_timer">Установить таймер приема углеводов</string>
     <string name="show_calculation">Показать расчет</string>
     <!-- Treatments -->
     <string name="no_records_available">Нет доступных записей</string>
     <string name="calculation_short">Кальк</string>
-    <string name="treatments_iob_label_string">IOB акт инс:</string>
+    <string name="treatments_iob_label_string">IOB:</string>
     <string name="treatments_carbs_label_string">Углеводы:</string>
     <string name="tempbasals_netratio_label_string">Процент:</string>
-    <string name="tempbasals_iob_label_string">IOB акт инс:</string>
+    <string name="tempbasals_iob_label_string">IOB:</string>
     <string name="treatments_wizard_correction_label">Коррекция</string>
     <string name="meal_bolus">На еду</string>
     <string name="prime">Заполн инфуз системы</string>
@@ -141,7 +142,7 @@
     <string name="quickwizard_settings">Мастер быстрой настройки</string>
     <string name="overview_edit_quickwizard_button_text">Текст на кнопке</string>
     <string name="overview_edit_quickwizard_valid">Верно:</string>
-    <string name="overview_edit_quickwizard_use_positive_iob_only">Только положительный активный инсулин IOB</string>
+    <string name="overview_edit_quickwizard_use_positive_iob_only">Только положительный IOB</string>
     <string name="overview_edit_quickwizard_superbolus">Суперболюс</string>
     <string name="overview_edit_quickwizard_percentage_too_high">Процент слишком высокий!</string>
     <string name="a11y_drag_and_drop_handle">перетаскиватель</string>

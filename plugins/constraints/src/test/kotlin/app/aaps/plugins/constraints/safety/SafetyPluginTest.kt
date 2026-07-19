@@ -21,6 +21,7 @@ import app.aaps.plugins.aps.openAPSAMA.OpenAPSAMAPlugin
 import app.aaps.plugins.aps.openAPSSMB.DetermineBasalSMB
 import app.aaps.plugins.aps.openAPSSMB.GlucoseStatusCalculatorSMB
 import app.aaps.plugins.aps.openAPSSMB.OpenAPSSMBPlugin
+import app.aaps.plugins.aps.dynamiccr.DynamicCarbRatioCalculator
 import app.aaps.plugins.source.GlimpPlugin
 import app.aaps.pump.virtual.VirtualPumpPlugin
 import app.aaps.shared.tests.TestBaseWithProfile
@@ -44,6 +45,7 @@ class SafetyPluginTest : TestBaseWithProfile() {
     @Mock lateinit var tddCalculator: TddCalculator
     @Mock lateinit var determineBasalAMA: DetermineBasalAMA
     @Mock lateinit var determineBasalSMB: DetermineBasalSMB
+    @Mock lateinit var dynamicCarbRatioCalculator: DynamicCarbRatioCalculator
     @Mock lateinit var loop: Loop
 
     private lateinit var safetyPlugin: SafetyPlugin
@@ -76,12 +78,15 @@ class SafetyPluginTest : TestBaseWithProfile() {
         whenever(activePlugin.activePump).thenReturn(virtualPumpPlugin)
         whenever(virtualPumpPlugin.pumpDescription).thenReturn(pumpDescription)
         whenever(config.APS).thenReturn(true)
-        safetyPlugin = SafetyPlugin(aapsLogger, rh, preferences, constraintChecker, activePlugin, hardLimits, config, persistenceLayer, dateUtil, uiInteraction, decimalFormatter)
+        safetyPlugin = SafetyPlugin(aapsLogger, rh, preferences, constraintChecker, activePlugin,
+                                    hardLimits, config, persistenceLayer, dateUtil, uiInteraction,
+                                    decimalFormatter, glucoseStatusProvider, profileFunction,
+                                    iobCobCalculator, profileUtil)
         openAPSSMBPlugin =
             OpenAPSSMBPlugin(
-                aapsLogger, rxBus, constraintChecker, rh, profileFunction, profileUtil, config, activePlugin, iobCobCalculator,
+                injector, aapsLogger, rxBus, constraintChecker, rh, profileFunction, profileUtil, config, activePlugin, iobCobCalculator,
                 hardLimits, preferences, dateUtil, processedTbrEbData, persistenceLayer, glucoseStatusProvider, tddCalculator, bgQualityCheck,
-                uiInteraction, determineBasalSMB, profiler, GlucoseStatusCalculatorSMB(aapsLogger, iobCobCalculator, dateUtil, decimalFormatter, deltaCalculator), apsResultProvider
+                uiInteraction, determineBasalSMB, profiler, GlucoseStatusCalculatorSMB(aapsLogger, iobCobCalculator, dateUtil, decimalFormatter, deltaCalculator), apsResultProvider, dynamicCarbRatioCalculator
             )
         openAPSAMAPlugin =
             OpenAPSAMAPlugin(

@@ -28,7 +28,9 @@ import app.aaps.core.interfaces.rx.events.EventDismissNotification
 import app.aaps.core.interfaces.rx.events.EventIobCalculationProgress
 import app.aaps.core.interfaces.rx.events.EventNewHistoryData
 import app.aaps.core.interfaces.rx.events.EventNewNotification
+import app.aaps.core.interfaces.rx.events.EventPreferenceChange
 import app.aaps.core.interfaces.rx.events.EventPumpStatusChanged
+import app.aaps.core.interfaces.rx.events.EventRebuildTabs
 import app.aaps.core.interfaces.rx.events.EventUpdateOverviewCalcProgress
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
@@ -42,11 +44,14 @@ import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.plugins.main.general.overview.boost.BoostOverviewFragment
+import app.aaps.plugins.main.general.overview.boost.BoostOverviewV2Fragment
 import app.aaps.core.objects.extensions.put
 import app.aaps.core.objects.extensions.store
 import app.aaps.core.validators.preferences.AdaptiveClickPreference
 import app.aaps.core.validators.preferences.AdaptiveDoublePreference
 import app.aaps.core.validators.preferences.AdaptiveIntPreference
+import app.aaps.core.validators.preferences.AdaptiveListIntPreference
 import app.aaps.core.validators.preferences.AdaptiveIntentPreference
 import app.aaps.core.validators.preferences.AdaptiveSwitchPreference
 import app.aaps.core.validators.preferences.AdaptiveUnitPreference
@@ -101,6 +106,8 @@ class OverviewPlugin @Inject constructor(
 
     override fun onStart() {
         super.onStart()
+        migrateBoostOverviewModeFromLegacyToggles()
+        updateFragmentClass()
         registerLocalBroadcastReceiver()
         overviewMenus.loadGraphConfig()
         overviewData.initRange()
@@ -133,7 +140,58 @@ class OverviewPlugin @Inject constructor(
             .subscribe({
                            overviewData.pumpStatus = it.getStatus(context)
                        }, fabricPrivacy::logException)
+        disposable += rxBus
+            .toObservable(EventPreferenceChange::class.java)
+            .observeOn(aapsSchedulers.io)
+            .subscribe({
+                           if (it.isChanged(IntKey.OverviewBoostMode.key)) {
+                               updateFragmentClass()
+                               // Rebuild the tabs in place so the new/old Overview swaps live.
+                               // Without this the swap only takes effect after an app restart,
+                               // which wipes the in-memory loop.lastRun (DynISF, predictions) and
+                               // overviewData, making them disappear until the next BG triggers a
+                               // loop run. Rebuilding in place keeps those singletons alive.
+                               rxBus.send(EventRebuildTabs())
+                           }
+                           // The home-screen widget mirrors overview data, but being an
+                           // AppWidgetProvider it can't subscribe to EventPreferenceChange itself.
+                           // Without this push, display-affecting prefs (e.g. "Always show TBR in %")
+                           // only reach the widget on the next minute tick or data refresh, while the
+                           // fragment updates immediately. Refresh the widget now to keep them in sync.
+                           uiInteraction.updateWidget(context, "EventPreferenceChange")
+                       }, fabricPrivacy::logException)
 
+    }
+
+    /**
+     * Swap the Overview tab fragment based on the Boost overview preference.
+     * The tab system reads pluginDescription.fragmentClass to determine
+     * which fragment to instantiate, so changing it here is sufficient.
+     */
+    private fun updateFragmentClass() {
+        // 0 = Standard (stock), 1 = Boost (modified) [V1 overview], 2 = Boost [V2 overview].
+        pluginDescription.fragmentClass = when (preferences.get(IntKey.OverviewBoostMode)) {
+            2    -> BoostOverviewV2Fragment::class.qualifiedName
+            1    -> BoostOverviewFragment::class.qualifiedName
+            else -> OverviewFragment::class.qualifiedName
+        }
+    }
+
+    /**
+     * One-time migration: the overview selection used to be two boolean toggles
+     * (OverviewUseBoostOverview / ...V2). It is now a single 3-way radio (IntKey.OverviewBoostMode).
+     * If the new key was never written (fresh upgrade) seed it from whichever legacy toggle was on, so
+     * a user on a Boost overview doesn't silently drop back to Standard. Runs once: once the key is
+     * written, getIfExists() is non-null and this is a no-op — so a later explicit "Standard" sticks.
+     */
+    private fun migrateBoostOverviewModeFromLegacyToggles() {
+        if (preferences.getIfExists(IntKey.OverviewBoostMode) != null) return
+        val legacy = when {
+            preferences.get(BooleanKey.OverviewUseBoostOverviewV2) -> 2
+            preferences.get(BooleanKey.OverviewUseBoostOverview)   -> 1
+            else                                                    -> 0
+        }
+        if (legacy != 0) preferences.put(IntKey.OverviewBoostMode, legacy)
     }
 
     override fun onStop() {
@@ -169,6 +227,7 @@ class OverviewPlugin @Inject constructor(
             .put(IntKey.OverviewBattWarning, preferences)
             .put(IntKey.OverviewBattCritical, preferences)
             .put(IntKey.OverviewBolusPercentage, preferences)
+            .put(BooleanKey.ApsAutoIsfExerciseMode, preferences)
             .put(BooleanNonKey.AutosensUsedOnMainPhone.key, constraintsChecker.isAutosensModeEnabled().value())
 
     override fun applyConfiguration(configuration: JSONObject) {
@@ -199,6 +258,7 @@ class OverviewPlugin @Inject constructor(
             .store(IntKey.OverviewBattWarning, preferences)
             .store(IntKey.OverviewBattCritical, preferences)
             .store(IntKey.OverviewBolusPercentage, preferences)
+            .store(BooleanKey.ApsAutoIsfExerciseMode, preferences)
             .store(BooleanNonKey.AutosensUsedOnMainPhone, preferences)
 
         val newUnits = preferences.getIfExists(StringKey.GeneralUnits) ?: "new"
@@ -214,6 +274,7 @@ class OverviewPlugin @Inject constructor(
             view.text = "${config.VERSION_NAME} (${config.HEAD.substring(0, 4)})"
             if (config.COMMITTED) {
                 view.setTextColor(rh.gac(context, app.aaps.core.ui.R.attr.omniGrayColor))
+                view.setTypeface(null, Typeface.BOLD)
                 view.alpha = 1.0f
             } else if (preferences.get(LongComposedKey.AppExpiration, config.VERSION_NAME) != 0L) {
                 view.setTextColor(rh.gac(context, app.aaps.core.ui.R.attr.metadataTextWarningColor))
@@ -315,10 +376,25 @@ class OverviewPlugin @Inject constructor(
             addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.OverviewResetBolusPercentageTime, dialogMessage = R.string.deliver_part_of_boluswizard_reset_time, title = app.aaps.core.ui.R.string.partialboluswizard_reset_time))
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.OverviewUseBolusAdvisor, summary = R.string.enable_bolus_advisor_summary, title = R.string.enable_bolus_advisor))
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.OverviewUseBolusReminder, summary = R.string.enablebolusreminder_summary, title = R.string.enablebolusreminder))
+            addPreference(
+                AdaptiveListIntPreference(
+                    ctx = context, intKey = IntKey.OverviewBoostMode, title = R.string.overview_mode_title, summary = R.string.overview_mode_summary,
+                    entries = arrayOf<CharSequence>(rh.gs(R.string.overview_mode_standard), rh.gs(R.string.overview_mode_boost_modified), rh.gs(R.string.overview_mode_boost)),
+                    entryValues = arrayOf<CharSequence>("0", "1", "2")
+                )
+            )
+            addPreference(
+                AdaptiveSwitchPreference(
+                    ctx = context, booleanKey = BooleanKey.OverviewAlwaysUsePhoneSteps,
+                    title = R.string.overview_always_phone_steps_title, summary = R.string.overview_always_phone_steps_summary
+                )
+            )
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
                 key = "overview_advanced_settings"
                 title = rh.gs(app.aaps.core.ui.R.string.advanced_settings_title)
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.OverviewUseSuperBolus, summary = R.string.enablesuperbolus_summary, title = R.string.enablesuperbolus))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.OverviewBasalIsAlwaysNotAbsolute, title = R.string.overview_basal_always_not_absolute))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.OverviewRecalcOnTempTarget, summary = R.string.recalc_on_temp_target_summary, title = R.string.recalc_on_temp_target_title))
             })
         }
     }

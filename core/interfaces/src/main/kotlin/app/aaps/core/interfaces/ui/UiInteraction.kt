@@ -22,6 +22,7 @@ interface UiInteraction {
     val preferencesActivity: Class<*>
     val myPreferenceFragment: Class<*>
     val quickWizardListActivity: Class<*>
+    val treatmentsActivity: Class<*>
 
     companion object {
 

@@ -73,6 +73,13 @@ class OverviewMenusImpl @Inject constructor(
         DEVSLOPE(R.string.overview_show_deviation_slope, app.aaps.core.ui.R.attr.devSlopePosColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.devslope_shortname),
         HR(R.string.overview_show_heartRate, app.aaps.core.ui.R.attr.heartRateColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.heartRate_shortname),
         STEPS(R.string.overview_show_steps, app.aaps.core.ui.R.attr.stepsColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.steps_shortname),
+        ACCE_ISF(R.string.overview_show_acce_isf, app.aaps.core.ui.R.attr.acceIsfColor, app.aaps.core.ui.R.attr.menuTextColorInverse, primary = false, secondary = true, shortnameId = R.string.acce_isf_shortname),
+        BG_ISF(R.string.overview_show_bg_isf, app.aaps.core.ui.R.attr.bgIsfColor, app.aaps.core.ui.R.attr.menuTextColorInverse, primary = false, secondary = true, shortnameId = R.string.bg_isf_shortname),
+        PP_ISF(R.string.overview_show_pp_isf, app.aaps.core.ui.R.attr.ppIsfColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.pp_isf_shortname),
+        DURA_ISF(R.string.overview_show_dura_isf, app.aaps.core.ui.R.attr.duraIsfColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.dura_isf_shortname),
+        FINAL_ISF(R.string.overview_show_final_isf, app.aaps.core.ui.R.attr.finalIsfColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.final_isf_shortname),
+        IOB_TH(R.string.overview_show_iob_th, app.aaps.core.ui.R.attr.iobThColor, app.aaps.core.ui.R.attr.menuTextColor, primary = false, secondary = true, shortnameId = R.string.iob_th_shortname),
+        PROFILE_CHANGE(R.string.overview_show_profile_change, app.aaps.core.ui.R.attr.ratioColor, app.aaps.core.ui.R.attr.menuTextColorInverse, primary = true, secondary = false, shortnameId = R.string.profile_change_shortname),
     }
 
     init {
@@ -85,6 +92,14 @@ class OverviewMenusImpl @Inject constructor(
         }
         CharTypeData.DEVSLOPE.visibility = { config.isDev() }
         CharTypeData.VAR_SENS.visibility = { preferences.get(BooleanKey.ApsUseDynamicSensitivity) || (preferences.get(BooleanKey.ApsUseAutoIsfWeights) && config.isDev()) }
+        // AutoISF intermediate-factor graphs are only meaningful when AutoISF weights are active
+        val autoIsfActive = { preferences.get(BooleanKey.ApsUseAutoIsfWeights) }
+        CharTypeData.ACCE_ISF.visibility = autoIsfActive
+        CharTypeData.BG_ISF.visibility = autoIsfActive
+        CharTypeData.PP_ISF.visibility = autoIsfActive
+        CharTypeData.DURA_ISF.visibility = autoIsfActive
+        CharTypeData.FINAL_ISF.visibility = autoIsfActive
+        CharTypeData.IOB_TH.visibility = autoIsfActive
     }
 
     companion object {
@@ -119,9 +134,9 @@ class OverviewMenusImpl @Inject constructor(
                 }
             else
                 listOf(
-                    arrayOf(true, true, true, false, false, false, false, false, false, false, false, false, false, false),
-                    arrayOf(false, false, false, false, true, false, false, false, false, false, false, false, false, false),
-                    arrayOf(false, false, false, false, false, true, false, false, false, false, false, false, false, false)
+                    arrayOf(true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
+                    arrayOf(false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
+                    arrayOf(false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false)
                 )
 
     @Synchronized

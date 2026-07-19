@@ -136,18 +136,20 @@ class KeepAliveWorker(
         localAlertUtils.checkStaleBGAlert()
         checkPump()
         checkAPS()
-        maintenancePlugin.deleteLogs(30)
-        workerDbStatus()
-        databaseCleanup()
+        dailyMaintenance()
 
         return Result.success()
     }
 
-    // Perform history data cleanup every day
-    // Keep 6 months
-    private fun databaseCleanup() {
+    // Daily maintenance: log + WorkManager-DB cleanup and history cleanup.
+    // Previously deleteLogs()/workerDbStatus() ran on every 5-min KeepAlive cycle (a log-dir scan
+    // and a full WorkManager-DB query 24/7); gate them on the same daily guard as the DB cleanup
+    // to avoid the constant disk/CPU wakeups. Keep 6 months of history.
+    private fun dailyMaintenance() {
         val lastRun = preferences.get(LongNonKey.LastCleanupRun)
         if (lastRun < dateUtil.now() - T.days(1).msecs()) {
+            maintenancePlugin.deleteLogs(30)
+            workerDbStatus()
             val result = persistenceLayer.cleanupDatabase(6 * 31, deleteTrackedChanges = false)
             aapsLogger.debug(LTag.CORE, "Cleanup result: $result")
             preferences.put(LongNonKey.LastCleanupRun, dateUtil.now())

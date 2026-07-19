@@ -14,15 +14,24 @@ import app.aaps.core.graph.data.PointsWithLabelGraphSeries
 import app.aaps.core.graph.data.RunningModeDataPoint
 import app.aaps.core.graph.data.ScaledDataPoint
 import app.aaps.core.graph.data.StepsDataPoint
+import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.db.ProcessedTbrEbData
 import app.aaps.core.interfaces.graph.Scale
 import app.aaps.core.interfaces.graph.SeriesData
+import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
 import app.aaps.core.interfaces.overview.OverviewData
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.IntNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.R
@@ -37,6 +46,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Instant
@@ -45,11 +56,16 @@ import kotlin.time.Instant
 class OverviewDataImpl @Inject constructor(
     private val rh: ResourceHelper,
     private val dateUtil: DateUtil,
-    private val preferences: Preferences,
     private val activePlugin: ActivePlugin,
     private val profileFunction: ProfileFunction,
     private val persistenceLayer: PersistenceLayer,
-    private val processedTbrEbData: ProcessedTbrEbData
+    private val processedTbrEbData: ProcessedTbrEbData,
+    private val preferences: Preferences,
+    private val profileUtil: ProfileUtil,
+    private val processedDeviceStatusData: ProcessedDeviceStatusData,
+    private val config: Config,
+    private val aapsLogger: AAPSLogger,
+    private val constraintsChecker: ConstraintsChecker
 ) : OverviewData {
 
     override var rangeToDisplay = 6 // for graph
@@ -100,11 +116,31 @@ class OverviewDataImpl @Inject constructor(
         epsSeries = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
         maxTherapyEventValue = 0.0
         therapyEventSeries = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
+        maxProfileChangeValue = 0.0
+        profileChangeEventSeries = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
         heartRateGraphSeries = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
         stepsCountGraphSeries = PointsWithLabelGraphSeries<StepsDataPoint>()
         maxVarSensValueFound = 200.0
         minVarSensValueFound = 50.0
         varSensSeries = LineGraphSeries<ScaledDataPoint>()
+        maxAcceIsfValueFound = 1.0
+        minAcceIsfValueFound = 1.0
+        acceIsfSeries = LineGraphSeries<ScaledDataPoint>()
+        maxBgIsfValueFound = 1.0
+        minBgIsfValueFound = 1.0
+        bgIsfSeries = LineGraphSeries<ScaledDataPoint>()
+        maxPpIsfValueFound = 1.0
+        minPpIsfValueFound = 1.0
+        ppIsfSeries = LineGraphSeries<ScaledDataPoint>()
+        maxDuraIsfValueFound = 1.0
+        minDuraIsfValueFound = 1.0
+        duraIsfSeries = LineGraphSeries<ScaledDataPoint>()
+        maxFinalIsfValueFound = 1.0
+        minFinalIsfValueFound = 1.0
+        finalIsfSeries = LineGraphSeries<ScaledDataPoint>()
+        maxIobThValueFound = 1.0
+        minIobThValueFound = 0.0
+        iobThSeries = LineGraphSeries<ScaledDataPoint>()
     }
 
     override fun initRange() {
@@ -141,8 +177,8 @@ class OverviewDataImpl @Inject constructor(
         profileFunction.getProfile()?.let { profile ->
             var temporaryBasal = processedTbrEbData.getTempBasalIncludingConvertedExtended(dateUtil.now())
             if (temporaryBasal?.isInProgress == false) temporaryBasal = null
-            temporaryBasal?.let { rh.gs(app.aaps.plugins.main.R.string.temp_basal_overview_short_name) + " " + it.toStringShort(rh) }
-                ?: rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, profile.getBasal())
+            val usePercentage = preferences.get(BooleanKey.OverviewBasalIsAlwaysNotAbsolute)
+            temporaryBasal?.toStringShort(usePercentage, profile.getBasal(), rh) ?: rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, profile.getBasal())
         } ?: rh.gs(app.aaps.core.ui.R.string.value_unavailable_short)
 
     override fun temporaryBasalDialogText(): String =
@@ -153,6 +189,56 @@ class OverviewDataImpl @Inject constructor(
             }
                 ?: "${rh.gs(app.aaps.core.ui.R.string.base_basal_rate_label)}: ${rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, profile.getBasal())}"
         } ?: rh.gs(app.aaps.core.ui.R.string.value_unavailable_short)
+
+    override fun autoOrTddSensRatio(loop: Loop, iobCobCalculator: IobCobCalculator): Double? {
+        val useAutosens =
+            if (config.AAPSCLIENT) preferences.get(BooleanNonKey.AutosensUsedOnMainPhone)
+            else constraintsChecker.isAutosensModeEnabled().value()
+
+        val request = loop.lastRun?.request
+        val lastAutosensData = iobCobCalculator.ads.getLastAutosensData("Overview", aapsLogger, dateUtil)
+        val ratioUsed = request?.autosensResult?.ratio ?: 1.0
+
+        return if (useAutosens) {
+            if (preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity))
+                ratioUsed
+            else
+                lastAutosensData?.autosensResult?.ratio ?: 1.0
+        } else null
+    }
+
+    override fun sensitivityText(showIsfForCarbs: Boolean, loop: Loop, iobCobCalculator: IobCobCalculator): String {
+        val autosensRatio = autoOrTddSensRatio(loop, iobCobCalculator)
+        var text = ""
+        if (autosensRatio != null)
+            text += String.format(Locale.ENGLISH, "%.0f%%", autosensRatio * 100)
+
+        // Show variable sensitivity
+        val request = loop.lastRun?.request
+        val isfMgdl = profileFunction.getProfile()?.getProfileIsfMgdl()
+        val isfForCarbs = profileFunction.getProfile()?.getIsfMgdlForCarbs(dateUtil.now(), "Overview", config, processedDeviceStatusData)
+        val variableSens =
+            if (config.APS) request?.variableSens ?: 0.0
+            else if (config.AAPSCLIENT) processedDeviceStatusData.getAPSResult()?.variableSens ?: 0.0
+            else 0.0
+        if (variableSens != 0.0 && isfMgdl != null) {
+            if (autosensRatio != null) text += "\n"
+            text += if (!showIsfForCarbs || isfForCarbs == null)
+                String.format(
+                    Locale.getDefault(), "%1$.1f→%2$.1f",
+                    profileUtil.fromMgdlToUnits(isfMgdl, profileFunction.getUnits()),
+                    profileUtil.fromMgdlToUnits(variableSens, profileFunction.getUnits())
+                )
+            else
+                String.format(
+                    Locale.getDefault(), "%1$.1f→%2$.1f (%3$.1f)",
+                    profileUtil.fromMgdlToUnits(isfMgdl, profileFunction.getUnits()),
+                    profileUtil.fromMgdlToUnits(variableSens, profileFunction.getUnits()),
+                    profileUtil.fromMgdlToUnits(isfForCarbs, profileFunction.getUnits())
+                )
+        }
+        return text
+    }
 
     @DrawableRes override fun temporaryBasalIcon(): Int =
         profileFunction.getProfile()?.let { profile ->
@@ -215,6 +301,8 @@ class OverviewDataImpl @Inject constructor(
     override var treatmentsSeries: SeriesData = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
     override var maxTherapyEventValue = 0.0
     override var therapyEventSeries: SeriesData = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
+    override var maxProfileChangeValue = 0.0
+    override var profileChangeEventSeries: SeriesData = PointsWithLabelGraphSeries<DataPointWithLabelInterface>()
 
     override var maxIobValueFound = Double.MIN_VALUE
     override val iobScale = Scale()
@@ -256,4 +344,29 @@ class OverviewDataImpl @Inject constructor(
     override var minVarSensValueFound = 50.0
     override val varSensScale = Scale()
     override var varSensSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
+
+    override var maxAcceIsfValueFound = 1.0
+    override var minAcceIsfValueFound = 1.0
+    override val acceIsfScale = Scale()
+    override var acceIsfSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
+    override var maxBgIsfValueFound = 1.0
+    override var minBgIsfValueFound = 1.0
+    override val bgIsfScale = Scale()
+    override var bgIsfSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
+    override var maxPpIsfValueFound = 1.0
+    override var minPpIsfValueFound = 1.0
+    override val ppIsfScale = Scale()
+    override var ppIsfSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
+    override var maxDuraIsfValueFound = 1.0
+    override var minDuraIsfValueFound = 1.0
+    override val duraIsfScale = Scale()
+    override var duraIsfSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
+    override var maxFinalIsfValueFound = 1.0
+    override var minFinalIsfValueFound = 1.0
+    override val finalIsfScale = Scale()
+    override var finalIsfSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
+    override var maxIobThValueFound = 1.0
+    override var minIobThValueFound = 0.0
+    override val iobThScale = Scale()
+    override var iobThSeries: SeriesData = LineGraphSeries<ScaledDataPoint>()
 }

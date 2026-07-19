@@ -24,7 +24,17 @@ interface APSResult {
     var hasPredictions: Boolean
     var variableSens: Double?
     var isfMgdlForCarbs: Double? // used only to pass to AAPS client
+    var carbRatio: Double?       // effective CR used (Dynamic/Auto CR); null when not computed
+    var carbRatioReason: String? // Dynamic CR "Script debug" line
     var scriptDebug: List<String>?
+
+    // AutoISF intermediate ISF factors (for the AutoISF overview graphs). Null for non-AutoISF results.
+    var acceIsf: Double?
+    var bgIsf: Double?
+    var ppIsf: Double?
+    var duraIsf: Double?
+    var finalIsf: Double?
+    var iobThreshold: Double?
 
     val predictionsAsGv: MutableList<GV>
     val latestPredictionsTime: Long
@@ -49,6 +59,7 @@ interface APSResult {
     var oapsProfile: OapsProfile?
     var enConfig: ENConfig?
     var oapsProfileAutoIsf: OapsProfileAutoIsf?
+    var oapsProfileBoost: OapsProfileBoost?
     var mealData: MealData?
 
     val iob: IobTotal? get() = iobData?.get(0)
@@ -64,6 +75,8 @@ interface APSResult {
         UNKNOWN,
         AMA,
         SMB,
-        AUTO_ISF
+        AUTO_ISF,
+        BOOST,
+        EN
     }
 }

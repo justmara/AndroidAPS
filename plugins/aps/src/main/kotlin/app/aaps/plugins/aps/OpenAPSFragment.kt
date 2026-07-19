@@ -26,6 +26,7 @@ import app.aaps.core.utils.HtmlHelper
 import app.aaps.plugins.aps.databinding.OpenapsFragmentBinding
 import app.aaps.plugins.aps.events.EventOpenAPSUpdateGui
 import app.aaps.plugins.aps.events.EventResetOpenAPSGui
+import app.aaps.plugins.aps.extensions.dataClassToHtmlString
 import dagger.android.support.DaggerFragment
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign

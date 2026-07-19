@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="combov2_plugin_name">Accu Chek Combo</string>
+    <string name="combov2_plugin_name">Accu-Chek Combo</string>
     <string name="combov2_plugin_description">Нативная интеграция с помпами Accu-Chek Combo</string>
     <string name="combov2_could_not_connect">Не удалось подключиться к помпе</string>
     <string name="combov2_not_paired">Нет сопряжения с помпой</string>
@@ -10,7 +10,7 @@
     <string name="combov2_warning_10">Сбой Bluetooth; повторить сопряжение</string>
     <string name="combov2_error_1">Резервуар помпы пуст</string>
     <string name="combov2_error_2">Батарея разряжена</string>
-    <string name="combov2_error_4">закупорка</string>
+    <string name="combov2_error_4">Закупорка</string>
     <string name="combov2_error_5">Завершение резервирования данных помпы</string>
     <string name="combov2_error_6">Механическая ошибка</string>
     <string name="combov2_error_7">Ошибка электроники</string>
@@ -19,7 +19,7 @@
     <string name="combov2_error_10">Ошибка резервуара</string>
     <string name="combov2_error_11">Инфузионный набор не заполнен</string>
     <string name="combov2_extended_bolus_not_supported">Пролонгированный болюс не поддерживается</string>
-    <string name="combov2_title">Accu Chek Combo v2</string>
+    <string name="combov2_title">Accu-Chek Combo v2</string>
     <string name="combov2_pair_with_pump_title">Сопряжение с помпой</string>
     <string name="combov2_unpair_pump_title">Разорвать сопряжение с помпой</string>
     <string name="combov2_driver_state_label">Статус драйвера помпы</string>
@@ -64,10 +64,10 @@
     <string name="combov2_executing_command">Выполнение команды</string>
     <string name="combov2_getting_basal_profile_cmddesc">Получение базального профиля</string>
     <string name="combov2_setting_basal_profile_cmddesc">Установка базального профиля</string>
-    <string name="combov2_setting_tbr_cmddesc">Установка %1$d%% врем базала TBR на %2$d минут</string>
-    <string name="combov2_cancelling_tbr">Отмена текущего врем базала TBR</string>
+    <string name="combov2_setting_tbr_cmddesc">Установка %1$d%% TBR на %2$d мин</string>
+    <string name="combov2_cancelling_tbr">Отмена текущего TBR</string>
     <string name="combov2_delivering_bolus_cmddesc">Подается болюс %1$.1f ед</string>
-    <string name="combov2_fetching_tdd_history_cmddesc">Получение суточной истории дозировок TDD</string>
+    <string name="combov2_fetching_tdd_history_cmddesc">Получение TDD</string>
     <string name="combov2_updating_pump_datetime_cmddesc">Обновление даты и времени помпы</string>
     <string name="combov2_updating_pump_status_cmddesc">Обновление статуса помпы</string>
     <string name="combov2_pairing_pin_failure">PIN-код не принят. Проверьте наличие опечаток. Если
@@ -95,15 +95,16 @@
     <string name="combov2_reservoir_low_warning">Низкий уровень инсулина в картридже помпы</string>
     <string name="combov2_setting_tbr_succeeded">Настройки TBR выполнены</string>
     <string name="combov2_setting_tbr_failed">Не удалось установить TBR</string>
-    <string name="combov2_set_emulated_100_tbr">Установить эмуляцию. временного базала TBR 100%</string>
-    <string name="combov2_letting_emulated_100_tbr_finish">Позволить завершиться текущей эмуляции временного базала 100% TBR</string>
+    <string name="combov2_set_emulated_100_tbr">Установка эмулированного TBR 100%</string>
+    <string name="combov2_letting_emulated_100_tbr_finish">Ожидание завершения текущего эмулированного 100% TBR</string>
     <string name="combov2_ignoring_redundant_100_tbr">Игнорирование избыточного запроса на 100% TBR</string>
-    <string name="combov2_hit_unexpected_tbr_limit">При настройке ВБС: обнаружен непредвиденный предел: целевой процент %1$d%%, достиг предела %2$d%%</string>
+    <string name="combov2_hit_unexpected_tbr_limit">При настройке TBR обнаружен непредвиденный предел: целевой процент %1$d%%, достиг предела %2$d%%</string>
     <string name="combov2_cannot_set_absolute_tbr_if_basal_zero">Невозможно установить абсолютный TBR, если базовая скорость равна нулю</string>
     <string name="combov2_pair_with_pump_summary">Выполнить сопряжение AndroidAPS и Android с помпой Accu-Chek Combo</string>
     <string name="combov2_unpair_pump_summary">Отключить AndroidAPS и AndroidAPS от помпы Accu-Chek Combo</string>
-    <string name="combov2_unknown_tbr_detected">Обнаружена и остановлена неизвестная временная базальная скоростьTBR; в процентах: %1$d%%; оставшаяся продолжительность: %2$s</string>
+    <string name="combov2_unknown_tbr_detected">Обнаружен и остановлен неизвестный TBR: %1$d%%; осталось: %2$s</string>
     <string name="combov2_connection_error">Ошибка соединения: %1$s</string>
+    <string name="combov2_short_status_last_connection">Предыдущее соединение: %1$d мин. назад</string>
     <string name="combov2_short_status_alert">Предупреждение: %s</string>
     <string name="combov2_automatic_reservoir_entry">Автоматически определять и вносить запись о замене резервуара инсулина</string>
     <string name="combov2_automatic_battery_entry">Автоматически определять и вносить запись о замене батареи</string>

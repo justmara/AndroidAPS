@@ -35,12 +35,14 @@ import app.aaps.core.interfaces.rx.events.EventNewBG
 import app.aaps.core.interfaces.rx.events.EventNewHistoryData
 import app.aaps.core.interfaces.rx.events.EventPreferenceChange
 import app.aaps.core.interfaces.rx.events.EventRunningModeChange
+import app.aaps.core.interfaces.rx.events.EventTempTargetChange
 import app.aaps.core.interfaces.rx.events.EventTherapyEventChange
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.MidnightTime
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.interfaces.workflow.CalculationWorkflow
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.IntNonKey
@@ -95,9 +97,17 @@ class IobCobCalculatorPlugin @Inject constructor(
     private var iobTable = LongSparseArray<IobTotal>() // oldest at index 0
     private var basalDataTable = LongSparseArray<BasalData>() // oldest at index 0
 
-    override var ads: AutosensDataStore = AutosensDataStoreObject()
+    // @Volatile: the reference is swapped by the calculation worker thread and read by the APS loop
+    // thread and UI without holding dataLock; publish the swap so readers don't keep a stale store
+    // (the store's own internals are already @Synchronized).
+    @Volatile override var ads: AutosensDataStore = AutosensDataStoreObject()
 
     private val dataLock = Any()
+
+    // NOTE: never assigned since the autosens calculation moved to WorkManager, so the wait in
+    // getLastAutosensDataWithWaitForCalculationFinish() is currently a no-op (the loop can read
+    // autosens computed one cycle ago). A proper fix would await the MAIN_CALCULATION worker;
+    // left as-is here because making it block the loop thread is risky without that plumbing.
     private var thread: Thread? = null
 
     override fun onStart() {
@@ -115,6 +125,19 @@ class IobCobCalculatorPlugin @Inject constructor(
             .observeOn(aapsSchedulers.io)
             .subscribe({ event ->
                            newHistoryData(event.startDate, false, event)
+                       }, fabricPrivacy::logException)
+        // EventTempTargetChange
+        // When enabled, immediately trigger a full recalculation on any temp target change
+        // (set/cancel/modify) so the loop runs (and enacts to the pump if needed) and the
+        // target line on the graph is redrawn at once instead of waiting for the next BG.
+        // EventNewHistoryData is routed through scheduleHistoryDataChange, which coalesces the
+        // cancel+insert pair produced when a temp target is replaced.
+        disposable += rxBus
+            .toObservable(EventTempTargetChange::class.java)
+            .observeOn(aapsSchedulers.io)
+            .subscribe({
+                           if (preferences.get(BooleanKey.OverviewRecalcOnTempTarget))
+                               rxBus.send(EventNewHistoryData(dateUtil.now(), false))
                        }, fabricPrivacy::logException)
         // EventPreferenceChange
         disposable += rxBus
@@ -237,7 +260,10 @@ class IobCobCalculatorPlugin @Inject constructor(
     override fun calculateFromTreatmentsAndTemps(toTime: Long, profile: Profile): IobTotal {
         val now = System.currentTimeMillis()
         val time = ads.roundUpTime(toTime)
-        val cacheHit = iobTable[time]
+        // Read under dataLock: iobTable is mutated in place (put/removeAt) under the same lock by the
+        // calculation worker, and LongSparseArray is not thread-safe (a concurrent binary search can
+        // return wrong data or crash).
+        val cacheHit = synchronized(dataLock) { iobTable[time] }
         if (time < now && cacheHit != null) {
             //og.debug(">>> calculateFromTreatmentsAndTemps Cache hit " + new Date(time).toLocaleString());
             return cacheHit
@@ -296,7 +322,9 @@ class IobCobCalculatorPlugin @Inject constructor(
     override fun getBasalData(profile: Profile, fromTime: Long): BasalData {
         val now = System.currentTimeMillis()
         val time = ads.roundUpTime(fromTime)
-        var retVal = basalDataTable[time]
+        // Read under dataLock (see calculateFromTreatmentsAndTemps): basalDataTable is mutated in place
+        // under the same lock and LongSparseArray is not thread-safe.
+        var retVal = synchronized(dataLock) { basalDataTable[time] }
         if (retVal == null) {
             //log.debug(">>> getBasalData Cache miss " + new Date(time).toLocaleString());
             retVal = BasalData()

@@ -1,6 +1,8 @@
 import org.gradle.kotlin.dsl.debugImplementation
+import java.io.FileInputStream
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.ksp)
@@ -47,7 +49,7 @@ fun generateGitRemote(): String {
 fun generateDate(): String {
     val stringBuilder: StringBuilder = StringBuilder()
     // showing only date prevents app to rebuild everytime
-    stringBuilder.append(SimpleDateFormat("yyyy.MM.dd").format(Date()))
+    stringBuilder.append(SimpleDateFormat("yyyy.MM.dd-HH.mm").format(Date()))
     return stringBuilder.toString()
 }
 
@@ -81,14 +83,32 @@ fun allCommitted(): Boolean {
     }
 }
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
 
     namespace = "app.aaps"
+
+    if (keystorePropertiesFile.exists()) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
 
     defaultConfig {
         minSdk = Versions.minSdk
         targetSdk = Versions.targetSdk
 
+        buildConfigField("String", "CUSTOM_PATCH_VERSION", "\"${Versions.customPatchVersion}\"")
         buildConfigField("String", "VERSION", "\"$version\"")
         buildConfigField("String", "BUILDVERSION", "\"${generateGitBuild()}-${generateDate()}\"")
         buildConfigField("String", "REMOTE", "\"${generateGitRemote()}\"")
@@ -106,7 +126,15 @@ android {
             applicationId = "info.nightscout.androidaps"
             dimension = "standard"
             resValue("string", "app_name", "AAPS")
-            versionName = Versions.appVersion
+            versionName = Versions.buildName
+            manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
+            manifestPlaceholders["appIconRound"] = "@mipmap/ic_launcher_round"
+        }
+        create("advanced") {
+            applicationId = "info.nightscout.androidaps"
+            dimension = "standard"
+            resValue("string", "app_name", "AAPS+")
+            versionName = Versions.buildName
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
             manifestPlaceholders["appIconRound"] = "@mipmap/ic_launcher_round"
         }
@@ -114,7 +142,7 @@ android {
             applicationId = "info.nightscout.aapspumpcontrol"
             dimension = "standard"
             resValue("string", "app_name", "Pumpcontrol")
-            versionName = Versions.appVersion + "-pumpcontrol"
+            versionName = Versions.buildName + "-pumpcontrol"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_pumpcontrol"
             manifestPlaceholders["appIconRound"] = "@null"
         }
@@ -122,7 +150,7 @@ android {
             applicationId = "info.nightscout.aapsclient"
             dimension = "standard"
             resValue("string", "app_name", "AAPSClient")
-            versionName = Versions.appVersion + "-aapsclient"
+            versionName = Versions.buildName + "-aapsclient"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_yellowowl"
             manifestPlaceholders["appIconRound"] = "@mipmap/ic_yellowowl"
         }
@@ -130,13 +158,21 @@ android {
             applicationId = "info.nightscout.aapsclient2"
             dimension = "standard"
             resValue("string", "app_name", "AAPSClient2")
-            versionName = Versions.appVersion + "-aapsclient"
+            versionName = Versions.buildName + "-aapsclient"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_blueowl"
             manifestPlaceholders["appIconRound"] = "@mipmap/ic_blueowl"
         }
     }
 
     useLibrary("org.apache.http.legacy")
+
+    if (keystorePropertiesFile.exists()) {
+        buildTypes {
+            named("release") {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
 
     //Deleting it causes a binding error
     buildFeatures {
@@ -150,10 +186,10 @@ android {
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
                 var flavor = variant.productFlavors[0].name
-                // if (flavor == "full") flavor = "aaps"
-                // val date = SimpleDateFormat("yyMMdd").format(Date())
-                val gitbuild = generateGitBuild().take(8)
-                val fileName = "${version}-${flavor}-${gitbuild}.apk"
+                if (flavor == "full") flavor = "aaps"
+                val date = SimpleDateFormat("yyyyMMdd").format(Date())
+                // version == Versions.buildName, e.g. aaps-3.4.2.3_Boost_ML_20260605.apk
+                val fileName = "${flavor}-${version}_${date}.apk"
                 output.outputFileName = fileName
             }
     }

@@ -109,7 +109,7 @@ sealed class EventData : Event() {
     data class ActionProfileSwitchPreCheck(val timeShift: Int, val percentage: Int, val duration: Int) : EventData()
 
     @Serializable
-    data class ActionWizardPreCheck(val carbs: Int, val percentage: Int) : EventData()
+    data class ActionWizardPreCheck(val carbs: Int, val percentage: Int, val delay: Int) : EventData()
 
     @Serializable
     data class ActionQuickWizardPreCheck(val guid: String) : EventData()
@@ -366,7 +366,9 @@ sealed class EventData : Event() {
         val tempTargetLevel: Int,
         val reservoirString: String,
         val reservoir: Double,
-        val reservoirLevel: Int
+        val reservoirLevel: Int,
+        val variableSens: String = "",  // current DynISF / variable sensitivity in profile units (empty if N/A). Default keeps wire-compat with older wear apps.
+        val tirWeights: String = ""      // last-24h Time-In-Range distribution as 5 percentages "vlow,low,inrange,high,vhigh" (empty if N/A). Display-only.
     ) : EventData(), EventDataSet
 
     @Serializable

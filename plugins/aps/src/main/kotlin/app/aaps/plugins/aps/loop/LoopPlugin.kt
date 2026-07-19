@@ -65,6 +65,7 @@ import app.aaps.core.interfaces.rx.events.EventMobileToWear
 import app.aaps.core.interfaces.rx.events.EventNewNotification
 import app.aaps.core.interfaces.rx.events.EventNewOpenLoopNotification
 import app.aaps.core.interfaces.rx.events.EventRefreshOverview
+import app.aaps.core.interfaces.rx.events.EventRunningModeChange
 import app.aaps.core.interfaces.rx.events.EventTempTargetChange
 import app.aaps.core.interfaces.rx.weardata.EventData
 import app.aaps.core.interfaces.ui.UiInteraction
@@ -144,6 +145,15 @@ class LoopPlugin @Inject constructor(
 
     private var handler: Handler? = null
 
+    /**
+     * Timestamp of the most recent running-mode change this phone applied locally (button press or
+     * auto-force) and whose pump command it already issued through handleRunningModeChange /
+     * suspendLoop / goToZeroTemp. The EventRunningModeChange reconciler skips a change whose active
+     * RM carries this timestamp, so it only acts on follower-synced changes (which never set it) and
+     * does not double-issue the zero-TBR / cancel. Written before the DB write to avoid racing the event.
+     */
+    @Volatile private var locallyAppliedModeTimestamp: Long = 0
+
     override fun onStart() {
         createNotificationChannel()
         super.onStart()
@@ -153,7 +163,78 @@ class LoopPlugin @Inject constructor(
             .observeOn(aapsSchedulers.io)
             // Skip db change of ending previous TT
             .debounce(10L, TimeUnit.SECONDS)
-            .subscribe({ invoke("EventTempTargetChange", true) }, fabricPrivacy::logException)
+            .subscribe({
+                           // When "recalculate immediately after temp target" is enabled, the loop is
+                           // already invoked through the MAIN_CALCULATION triggered by EventNewHistoryData
+                           // (see IobCobCalculatorPlugin), so skip here to avoid a duplicate run.
+                           if (!preferences.get(BooleanKey.OverviewRecalcOnTempTarget))
+                               invoke("EventTempTargetChange", true)
+                       }, fabricPrivacy::logException)
+        disposable += rxBus
+            .toObservable(EventRunningModeChange::class.java)
+            .observeOn(aapsSchedulers.io)
+            .subscribe({
+                           // A running-mode change initiated on an AAPSClient follower only writes the mode
+                           // (the follower has no pump). On the main phone we must reconcile the pump to the
+                           // new mode right away instead of waiting for the next BG-triggered loop run -
+                           // otherwise the follower's action has no effect on delivery until the TBR expires.
+                           // The pump-side outcome must match pressing the same button locally on the main phone.
+                           if (config.APS) {
+                               val rm = persistenceLayer.getRunningModeActiveAt(dateUtil.now())
+                               // Skip changes this phone applied locally: handleRunningModeChange / suspendLoop /
+                               // goToZeroTemp already issued the matching pump command and marked the timestamp
+                               // before writing. Only follower-synced changes (which never set the marker) fall
+                               // through, so the reconciler no longer double-fires the zero-TBR / cancel.
+                               // NOTE (intended): auto-forced mode changes from runningModePreCheck() (source=Loop,
+                               // e.g. DISABLED_LOOP when loop invocation is lost) are deliberately NOT marked - their
+                               // write path issues no pump command, so the reconciler is the single path that applies
+                               // them to the pump. This is by design, not a double-fire.
+                               if (rm.timestamp == locallyAppliedModeTimestamp) return@subscribe
+                               when {
+                                   // Disconnect / super bolus: the pump must deliver zero for the remaining
+                                   // window, exactly like the local button (goToZeroTemp).
+                                   rm.mode == RM.Mode.DISCONNECTED_PUMP || rm.mode == RM.Mode.SUPER_BOLUS -> {
+                                       val profile = profileFunction.getProfile()
+                                       val remaining = T.msecs(rm.timestamp + rm.duration - dateUtil.now()).mins().toInt()
+                                       val activeTbr = persistenceLayer.getTemporaryBasalActiveAt(dateUtil.now())
+                                       val alreadyZeroed = activeTbr != null && activeTbr.rate == 0.0
+                                       if (profile != null && remaining > 0 && !alreadyZeroed) {
+                                           // The pump only accepts a TBR whose duration is a multiple of its step
+                                           // (e.g. 15 min for Accu-Chek); the raw remaining minutes usually are not,
+                                           // so the command would be rejected ("TBR delivery error"). Round up to the
+                                           // pump step, capped at the pump's max duration.
+                                           val step = activePlugin.activePump.pumpDescription.tempDurationStep
+                                           val maxDuration = activePlugin.activePump.pumpDescription.tempMaxDuration
+                                           var duration = if (step > 0) (remaining + step - 1) / step * step else remaining
+                                           if (maxDuration > 0) duration = duration.coerceAtMost(maxDuration)
+                                           // enforceNew = true: a real pump is often still executing a TEMPBASAL
+                                           // command from the regular loop run when the follower's mode change
+                                           // arrives. With enforceNew = false the queue's `!enforceNew && isRunning`
+                                           // guard silently drops this zero-TBR (executingNowError) and the
+                                           // disconnect never reaches the pump. VirtualPump completes instantly so
+                                           // it never collides. The alreadyZeroed check above keeps this idempotent.
+                                           if (duration > 0) applyEmulatedPumpSuspend(duration, profile, enforceNew = true)
+                                       }
+                                   }
+
+                                   // Disabled loop / user-or-DST suspend: stop APS-driven delivery by cancelling
+                                   // the running TBR (pump returns to scheduled basal). DISABLED_LOOP is not
+                                   // isSuspended() but must cancel the TBR too, matching the local disable path.
+                                   (rm.mode.isSuspended() || rm.mode == RM.Mode.DISABLED_LOOP) &&
+                                       persistenceLayer.getTemporaryBasalActiveAt(dateUtil.now()) != null     -> {
+                                       // enforceNew = true for the same reason as the zero-TBR path above: on a
+                                       // real pump a TEMPBASAL command is often still executing when the follower's
+                                       // change arrives, and enforceNew = false would drop this cancel.
+                                       commandQueue.cancelTempBasal(enforceNew = true, callback = object : Callback() {
+                                           override fun run() {
+                                               if (!result.success)
+                                                   uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
+                                           }
+                                       })
+                                   }
+                               }
+                           }
+                       }, fabricPrivacy::logException)
     }
 
     private fun createNotificationChannel() {
@@ -251,6 +332,8 @@ class LoopPlugin @Inject constructor(
 
             RM.Mode.SUSPENDED_BY_PUMP                           -> {} // handled in runningModePreCheck()
             RM.Mode.DISABLED_LOOP, RM.Mode.CLOSED_LOOP, RM.Mode.OPEN_LOOP, RM.Mode.CLOSED_LOOP_LGS -> {
+                // Only DISABLED_LOOP issues a pump command below; mark before the write so the reconciler skips it.
+                if (newRM == RM.Mode.DISABLED_LOOP && config.APS) locallyAppliedModeTimestamp = now
                 val inserted = persistenceLayer.insertOrUpdateRunningMode(
                     runningMode = RM(
                         timestamp = now,
@@ -902,11 +985,14 @@ class LoopPlugin @Inject constructor(
      * Simulate pump disconnection
      */
     private fun goToZeroTemp(durationInMinutes: Int, profile: Profile, mode: RM.Mode, action: Action, source: Sources, listValues: List<ValueWithUnit>) {
-        val pump = activePlugin.activePump
+        val now = dateUtil.now()
+        // Mark before the DB write so the EventRunningModeChange reconciler (fired by that write) treats
+        // this as a locally-applied change and does not re-issue the pump command below.
+        if (config.APS) locallyAppliedModeTimestamp = now
         @SuppressLint("CheckResult")
         persistenceLayer.insertOrUpdateRunningMode(
             runningMode = RM(
-                timestamp = dateUtil.now(),
+                timestamp = now,
                 duration = T.mins(durationInMinutes.toLong()).msecs(),
                 mode = mode
             ),
@@ -915,33 +1001,45 @@ class LoopPlugin @Inject constructor(
             note = null,
             listValues = listValues
         ).blockingGet()
-        if (config.APS) {
-            if (pump.pumpDescription.tempBasalStyle == PumpDescription.ABSOLUTE) {
-                commandQueue.tempBasalAbsolute(0.0, durationInMinutes, true, profile, PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND, object : Callback() {
-                    override fun run() {
-                        if (!result.success) {
-                            uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
-                        }
+        if (config.APS) applyEmulatedPumpSuspend(durationInMinutes, profile, enforceNew = true)
+    }
+
+    /**
+     * Issue the pump-side commands that emulate a pump suspend: a zero temp basal for [durationInMinutes]
+     * and cancellation of any running extended bolus. Pure pump action - does NOT write a running mode,
+     * so it is safe to call from the [EventRunningModeChange] reconciler without re-triggering the event.
+     *
+     * @param enforceNew true for both the local button and the follower reconciler path: a real pump may
+     * still be executing a TEMPBASAL command from the regular loop run, and with enforceNew = false the
+     * command queue silently drops a colliding request. Callers guard idempotency before calling.
+     */
+    private fun applyEmulatedPumpSuspend(durationInMinutes: Int, profile: Profile, enforceNew: Boolean) {
+        val pump = activePlugin.activePump
+        if (pump.pumpDescription.tempBasalStyle == PumpDescription.ABSOLUTE) {
+            commandQueue.tempBasalAbsolute(0.0, durationInMinutes, enforceNew, profile, PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND, object : Callback() {
+                override fun run() {
+                    if (!result.success) {
+                        uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
                     }
-                })
-            } else {
-                commandQueue.tempBasalPercent(0, durationInMinutes, true, profile, PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND, object : Callback() {
-                    override fun run() {
-                        if (!result.success) {
-                            uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
-                        }
+                }
+            })
+        } else {
+            commandQueue.tempBasalPercent(0, durationInMinutes, enforceNew, profile, PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND, object : Callback() {
+                override fun run() {
+                    if (!result.success) {
+                        uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
                     }
-                })
-            }
-            if (pump.pumpDescription.isExtendedBolusCapable && persistenceLayer.getExtendedBolusActiveAt(dateUtil.now()) != null) {
-                commandQueue.cancelExtended(object : Callback() {
-                    override fun run() {
-                        if (!result.success) {
-                            uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.extendedbolusdeliveryerror), app.aaps.core.ui.R.raw.boluserror)
-                        }
+                }
+            })
+        }
+        if (pump.pumpDescription.isExtendedBolusCapable && persistenceLayer.getExtendedBolusActiveAt(dateUtil.now()) != null) {
+            commandQueue.cancelExtended(object : Callback() {
+                override fun run() {
+                    if (!result.success) {
+                        uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.extendedbolusdeliveryerror), app.aaps.core.ui.R.raw.boluserror)
                     }
-                })
-            }
+                }
+            })
         }
     }
 
@@ -950,16 +1048,25 @@ class LoopPlugin @Inject constructor(
      */
     fun suspendLoop(mode: RM.Mode, autoForced: Boolean, reasons: String?, durationInMinutes: Int, action: Action, source: Sources, note: String? = null, listValues: List<ValueWithUnit> = emptyList()) {
         assert(mode == RM.Mode.SUSPENDED_BY_PUMP || mode == RM.Mode.SUSPENDED_BY_USER)
+        val now = dateUtil.now()
+        // Mark before the DB write so the EventRunningModeChange reconciler skips this locally-applied
+        // suspend (the cancelTempBasal below already handles the pump) and does not double-cancel.
+        if (config.APS) locallyAppliedModeTimestamp = now
         @SuppressLint("CheckResult")
         persistenceLayer.insertOrUpdateRunningMode(
-            runningMode = RM(timestamp = dateUtil.now(), duration = T.mins(durationInMinutes.toLong()).msecs(), mode = mode, autoForced = autoForced, reasons = reasons),
+            runningMode = RM(timestamp = now, duration = T.mins(durationInMinutes.toLong()).msecs(), mode = mode, autoForced = autoForced, reasons = reasons),
             action = action,
             source = source,
             note = note,
             listValues = listValues
         ).blockingGet()
         if (config.APS)
-            commandQueue.cancelTempBasal(enforceNew = false, autoForced = autoForced, callback = object : Callback() {
+            // enforceNew = true for a user/DST suspend: since the reconciler now skips this locally-applied
+            // change (marker above), this is the ONLY cancel issued. With enforceNew = false a TEMPBASAL
+            // command still executing from the regular loop run would be dropped by the queue's
+            // `!enforceNew && isRunning` guard and the suspend would not reach the pump. The auto-forced
+            // SUSPENDED_BY_PUMP path keeps enforceNew = false: the pump is already physically suspended.
+            commandQueue.cancelTempBasal(enforceNew = !autoForced, autoForced = autoForced, callback = object : Callback() {
                 override fun run() {
                     if (!result.success) {
                         uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
@@ -969,18 +1076,14 @@ class LoopPlugin @Inject constructor(
     }
 
     var task: Runnable? = null
+    var lastDeviceStatusCreation: Long = 0
 
     override fun scheduleBuildAndStoreDeviceStatus(reason: String) {
-        class UpdateRunnable : Runnable {
-
-            override fun run() {
-                buildAndStoreDeviceStatus(reason)
-                task = null
-            }
+        val now = System.currentTimeMillis()
+        if (now - lastDeviceStatusCreation > 5000) {
+            buildAndStoreDeviceStatus(reason)
+            lastDeviceStatusCreation = now
         }
-        task?.let { handler?.removeCallbacks(it) }
-        task = UpdateRunnable()
-        task?.let { handler?.postDelayed(it, 5000) }
     }
 
     fun buildAndStoreDeviceStatus(reason: String) {

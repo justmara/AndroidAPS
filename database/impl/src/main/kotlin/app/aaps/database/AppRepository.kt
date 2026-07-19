@@ -97,7 +97,7 @@ class AppRepository @Inject internal constructor(
         if (database.effectiveProfileSwitchDao.getEffectiveProfileSwitchDataFromTime(than + 1).blockingGet().isNotEmpty())
             removed.add(Pair("EffectiveProfileSwitch", database.effectiveProfileSwitchDao.deleteOlderThan(than)))
         removed.add(Pair("ProfileSwitch", database.profileSwitchDao.deleteOlderThan(than)))
-        removed.add(Pair("ApsResult", database.apsResultDao.deleteOlderThan(than)))
+        // APSResult already cleaned up above (line ~85); the duplicate "ApsResult" pass was removed.
         // keep version history database.versionChangeDao.deleteOlderThan(than)
         removed.add(Pair("UserEntry", database.userEntryDao.deleteOlderThan(than)))
         removed.add(Pair("PreferenceChange", database.preferenceChangeDao.deleteOlderThan(than)))

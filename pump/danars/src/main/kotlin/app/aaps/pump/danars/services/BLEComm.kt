@@ -568,7 +568,7 @@ class BLEComm @Inject internal constructor(
             danaPump.ignoreUserPassword = false
             // Grab pairing key from preferences if exists
             val pairingKey = preferences.get(DanaStringComposedKey.ParingKey, danaRSPlugin.mDeviceName)
-            aapsLogger.debug(LTag.PUMPBTCOMM, "Using stored pairing key: $pairingKey")
+            aapsLogger.debug(LTag.PUMPBTCOMM, "Using stored pairing key: ${if (pairingKey.isEmpty()) "none" else "present(len=${pairingKey.length})"}")
             if (pairingKey.isNotEmpty()) {
                 sendPasskeyCheck(pairingKey)
             } else {
@@ -785,7 +785,7 @@ class BLEComm @Inject internal constructor(
         val pairingKey = byteArrayOf(decryptedBuffer[2], decryptedBuffer[3])
         // store pairing key to preferences
         preferences.put(DanaStringComposedKey.ParingKey, danaRSPlugin.mDeviceName, value = DanaRSPacket.bytesToHex(pairingKey))
-        aapsLogger.debug(LTag.PUMPBTCOMM, "Got pairing key: " + DanaRSPacket.bytesToHex(pairingKey))
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Got pairing key (len=" + pairingKey.size + ")")
     }
 
     // 3rd packet Easy menu pump

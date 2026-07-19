@@ -355,6 +355,12 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
             var useBGIForScale = false
             var useHRForScale = false
             var useSTEPSForScale = false
+            var useAcceIsfForScale = false
+            var useBgIsfForScale = false
+            var usePpIsfForScale = false
+            var useDuraIsfForScale = false
+            var useFinalIsfForScale = false
+            var useIobThForScale = false
             when {
                 menuChartSettings[g + 1][OverviewMenus.CharType.ABS.ordinal]      -> useABSForScale = true
                 menuChartSettings[g + 1][OverviewMenus.CharType.IOB.ordinal]      -> useIobForScale = true
@@ -366,8 +372,26 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
                 menuChartSettings[g + 1][OverviewMenus.CharType.DEVSLOPE.ordinal] -> useDSForScale = true
                 menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal]       -> useHRForScale = true
                 menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal]    -> useSTEPSForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal] -> useAcceIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal]   -> useBgIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal]   -> usePpIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal] -> useDuraIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal]-> useFinalIsfForScale = true
+                menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal]   -> useIobThForScale = true
             }
             val alignDevBgiScale = menuChartSettings[g + 1][OverviewMenus.CharType.DEV.ordinal] && menuChartSettings[g + 1][OverviewMenus.CharType.BGI.ordinal]
+            // AutoISF factor graphs: when 2+ are on the same sub-graph, share one 1.0-centred axis (maxAutoIsfFactor)
+            var maxAutoIsfFactor = 1.0
+            var commonIsfCount = 0
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, historyBrowserData.overviewData.maxFinalIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, historyBrowserData.overviewData.maxAcceIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, historyBrowserData.overviewData.maxBgIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, historyBrowserData.overviewData.maxPpIsfValueFound); commonIsfCount++ }
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal]) { maxAutoIsfFactor = maxOf(maxAutoIsfFactor, historyBrowserData.overviewData.maxDuraIsfValueFound); commonIsfCount++ }
+            val useCommonISFForScale = commonIsfCount > 1
+            val maxCommonIob = if (menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal] &&
+                (menuChartSettings[g + 1][OverviewMenus.CharType.IOB.ordinal] || menuChartSettings[g + 1][OverviewMenus.CharType.ABS.ordinal])
+            ) maxOf(historyBrowserData.overviewData.maxIobValueFound, historyBrowserData.overviewData.maxIobThValueFound) else 0.0
 
             if (menuChartSettings[g + 1][OverviewMenus.CharType.ABS.ordinal]) secondGraphData.addAbsIob(useABSForScale, 1.0)
             if (menuChartSettings[g + 1][OverviewMenus.CharType.IOB.ordinal]) secondGraphData.addIob(useIobForScale, 1.0)
@@ -377,8 +401,14 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
             if (menuChartSettings[g + 1][OverviewMenus.CharType.SEN.ordinal]) secondGraphData.addRatio(useRatioForScale, if (useRatioForScale) 1.0 else 0.8)
             if (menuChartSettings[g + 1][OverviewMenus.CharType.VAR_SEN.ordinal]) secondGraphData.addVarSens(useVarSensForScale, if (useVarSensForScale) 1.0 else 0.8)
             if (menuChartSettings[g + 1][OverviewMenus.CharType.DEVSLOPE.ordinal] && config.isDev()) secondGraphData.addDeviationSlope(useDSForScale, 1.0)
-            if (menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal] && config.isDev()) secondGraphData.addHeartRate(useHRForScale, 1.0)
-            if (menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal] && config.isDev()) secondGraphData.addSteps(useSTEPSForScale, 1.0)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal]) secondGraphData.addHeartRate(useHRForScale, 1.0)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal]) secondGraphData.addSteps(useSTEPSForScale, 1.0)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal]) secondGraphData.addAcceIsf(useAcceIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal]) secondGraphData.addBgIsf(useBgIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal]) secondGraphData.addPpIsf(usePpIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal]) secondGraphData.addDuraIsf(useDuraIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal]) secondGraphData.addFinalIsf(useFinalIsfForScale, 1.0, useCommonISFForScale, maxAutoIsfFactor)
+            if (menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal]) secondGraphData.addIobTh(useIobThForScale, if (maxCommonIob > 0.0) 1.0 else 0.8, maxCommonIob)
             // set manual x bounds to have nice steps
             secondGraphData.formatAxis(historyBrowserData.overviewData.fromTime, historyBrowserData.overviewData.endTime)
             secondGraphData.addNowLine(now)
@@ -396,7 +426,13 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
                     menuChartSettings[g + 1][OverviewMenus.CharType.VAR_SEN.ordinal] ||
                     menuChartSettings[g + 1][OverviewMenus.CharType.DEVSLOPE.ordinal] ||
                     menuChartSettings[g + 1][OverviewMenus.CharType.HR.ordinal] ||
-                    menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal]
+                    menuChartSettings[g + 1][OverviewMenus.CharType.STEPS.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.ACCE_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.BG_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.PP_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.DURA_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.FINAL_ISF.ordinal] ||
+                    menuChartSettings[g + 1][OverviewMenus.CharType.IOB_TH.ordinal]
                 ).toVisibility()
             secondaryGraphsData[g].performUpdate()
         }

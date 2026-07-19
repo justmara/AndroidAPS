@@ -84,6 +84,13 @@ class CalculationWorkflowImpl @Inject constructor(
                     .build()
             )
             .then(
+                // Refresh step count / heart rate from Health Connect or the phone sensor before the
+                // treatments worker builds the steps graph series, so they show up regardless of the
+                // selected APS plugin. Skips silently when the standard Wear mechanism already provided
+                // recent values.
+                OneTimeWorkRequest.Builder(SampleMetricsWorker::class.java).build()
+            )
+            .then(
                 OneTimeWorkRequest.Builder(PrepareTreatmentsDataWorker::class.java)
                     .setInputData(dataWorkerStorage.storeInputData(PrepareTreatmentsDataWorker.PrepareTreatmentsData(overviewData)))
                     .build()

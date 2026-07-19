@@ -2,6 +2,7 @@ package app.aaps.plugins.main.general.smsCommunicator
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.telephony.SmsManager
 import android.telephony.SmsMessage
 import android.text.TextUtils
@@ -54,6 +55,7 @@ import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
 import app.aaps.core.interfaces.sync.XDripBroadcast
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
+import app.aaps.core.interfaces.utils.Round
 import app.aaps.core.interfaces.utils.SafeParse
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.BooleanKey
@@ -96,7 +98,7 @@ import kotlin.math.min
 class SmsCommunicatorPlugin @Inject constructor(
     aapsLogger: AAPSLogger,
     rh: ResourceHelper,
-    private val smsManager: SmsManager?,
+    private val smsManagerInjected: SmsManager?,
     private val aapsSchedulers: AapsSchedulers,
     private val preferences: Preferences,
     private val constraintChecker: ConstraintsChecker,
@@ -117,6 +119,7 @@ class SmsCommunicatorPlugin @Inject constructor(
     private val persistenceLayer: PersistenceLayer,
     private val decimalFormatter: DecimalFormatter,
     private val configBuilder: ConfigBuilder,
+    private val context: Context,
     private val authRequestProvider: Provider<AuthRequest>,
     private val pumpStatusProvider: PumpStatusProvider
 ) : PluginBase(
@@ -130,6 +133,10 @@ class SmsCommunicatorPlugin @Inject constructor(
         .description(R.string.description_sms_communicator),
     aapsLogger, rh
 ), SmsCommunicator {
+
+    @Suppress("DEPRECATION")
+    private val smsManager: SmsManager?
+        get() = smsManagerInjected ?: if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) SmsManager.getDefault() else context.getSystemService(SmsManager::class.java)
 
     private val disposable = CompositeDisposable()
     var allowedNumbers: MutableList<String> = ArrayList()
@@ -379,7 +386,7 @@ class SmsCommunicatorPlugin @Inject constructor(
             reply = rh.gs(R.string.sms_last_bg) + " " + profileUtil.valueInCurrentUnitsDetect(lastBG.recalculated) + " " + rh.gs(R.string.sms_min_ago, agoMin) + ", "
         }
         val glucoseStatus = glucoseStatusProvider.glucoseStatusData
-        if (glucoseStatus != null) reply += rh.gs(R.string.sms_delta) + " " + profileUtil.fromMgdlToUnits(glucoseStatus.delta) + " " + units + ", "
+        if (glucoseStatus != null) reply += rh.gs(R.string.sms_delta) + " " + profileUtil.fromMgdlToStringInUnits(glucoseStatus.delta) + " " + units + ", "
         val bolusIob = iobCobCalculator.calculateIobFromBolus().round()
         val basalIob = iobCobCalculator.calculateIobFromTempBasalsIncludingConvertedExtended().round()
         val cobInfo = iobCobCalculator.getCobInfo("SMS COB")
@@ -486,10 +493,11 @@ class SmsCommunicatorPlugin @Inject constructor(
                                         )
                                         val replyText = rh.gs(R.string.smscommunicator_loop_suspended) + " " +
                                             rh.gs(if (result.success) R.string.smscommunicator_tempbasal_canceled else R.string.smscommunicator_tempbasal_cancel_failed)
-                                        sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                        sendReport(receivedSms.phoneNumber, replyText)
                                     } else {
                                         var replyText = rh.gs(R.string.smscommunicator_tempbasal_cancel_failed)
-                                        replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                        if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                            replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                         sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                     }
                                 }
@@ -734,16 +742,13 @@ class SmsCommunicatorPlugin @Inject constructor(
                     commandQueue.cancelTempBasal(enforceNew = true, callback = object : Callback() {
                         override fun run() {
                             if (result.success) {
-                                var replyText = rh.gs(R.string.smscommunicator_tempbasal_canceled)
-                                replyText += "\n" + pumpStatusProvider.shortStatus(true)
-                                sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
-                                uel.log(
-                                    Action.TEMP_BASAL, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_tempbasal_canceled),
-                                    ValueWithUnit.SimpleString(rh.gsNotLocalised(R.string.smscommunicator_tempbasal_canceled))
-                                )
+                                sendReport(receivedSms.phoneNumber, rh.gs(R.string.smscommunicator_tempbasal_canceled),true)
+                                uel.log(Action.TEMP_BASAL, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_tempbasal_canceled),
+                                        ValueWithUnit.SimpleString(rh.gsNotLocalised(R.string.smscommunicator_tempbasal_canceled)))
                             } else {
                                 var replyText = rh.gs(R.string.smscommunicator_tempbasal_cancel_failed)
-                                replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                 sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                 uel.log(
                                     Action.TEMP_BASAL, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_tempbasal_cancel_failed),
@@ -779,8 +784,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                                             result.absolute,
                                             result.duration
                                         )
-                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
-                                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                    sendReport(receivedSms.phoneNumber, replyText, true)
                                     if (result.isPercent)
                                         uel.log(
                                             action = Action.TEMP_BASAL, source = Sources.SMS,
@@ -803,7 +807,8 @@ class SmsCommunicatorPlugin @Inject constructor(
                                         )
                                 } else {
                                     var replyText = rh.gs(R.string.smscommunicator_tempbasal_failed)
-                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                    if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                        replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                     sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                     uel.log(
                                         Action.TEMP_BASAL, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_tempbasal_failed),
@@ -834,10 +839,10 @@ class SmsCommunicatorPlugin @Inject constructor(
                         commandQueue.tempBasalAbsolute(aDouble(), secondInteger(), true, profile, PumpSync.TemporaryBasalType.NORMAL, object : Callback() {
                             override fun run() {
                                 if (result.success) {
-                                    var replyText = if (result.isPercent) rh.gs(R.string.smscommunicator_tempbasal_set_percent, result.percent, result.duration)
-                                    else rh.gs(R.string.smscommunicator_tempbasal_set, result.absolute, result.duration)
-                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
-                                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                    var replyText =
+                                        if (result.isPercent) rh.gs(R.string.smscommunicator_tempbasal_set_percent, result.percent, result.duration)
+                                        else rh.gs(R.string.smscommunicator_tempbasal_set, result.absolute, result.duration)
+                                    sendReport(receivedSms.phoneNumber, replyText, true)
                                     if (result.isPercent)
                                         uel.log(
                                             action = Action.TEMP_BASAL,
@@ -860,7 +865,8 @@ class SmsCommunicatorPlugin @Inject constructor(
                                         )
                                 } else {
                                     var replyText = rh.gs(R.string.smscommunicator_tempbasal_failed)
-                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                    if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                        replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                     sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                     uel.log(
                                         Action.TEMP_BASAL, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_tempbasal_failed),
@@ -885,12 +891,11 @@ class SmsCommunicatorPlugin @Inject constructor(
                     commandQueue.cancelExtended(object : Callback() {
                         override fun run() {
                             if (result.success) {
-                                var replyText = rh.gs(R.string.smscommunicator_extended_canceled)
-                                replyText += "\n" + pumpStatusProvider.shortStatus(true)
-                                sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                sendReport(receivedSms.phoneNumber, rh.gs(R.string.smscommunicator_extended_canceled), true)
                             } else {
                                 var replyText = rh.gs(R.string.smscommunicator_extended_cancel_failed)
-                                replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                 sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                 uel.log(
                                     Action.EXTENDED_BOLUS, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_extended_canceled),
@@ -919,8 +924,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                                 if (result.success) {
                                     var replyText = rh.gs(R.string.smscommunicator_extended_set, aDouble, duration)
                                     if (config.APS) replyText += "\n" + rh.gs(app.aaps.core.ui.R.string.loopsuspended)
-                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
-                                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                    sendReport(receivedSms.phoneNumber, replyText, true)
                                     if (config.APS)
                                         uel.log(
                                             action = Action.EXTENDED_BOLUS,
@@ -948,7 +952,8 @@ class SmsCommunicatorPlugin @Inject constructor(
                                         )
                                 } else {
                                     var replyText = rh.gs(R.string.smscommunicator_extended_failed)
-                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                    if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                        replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                     sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                     uel.log(
                                         Action.EXTENDED_BOLUS, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_extended_failed),
@@ -991,7 +996,8 @@ class SmsCommunicatorPlugin @Inject constructor(
                                             rh.gs(R.string.smscommunicator_meal_bolus_delivered, resultBolusDelivered)
                                         else
                                             rh.gs(R.string.smscommunicator_bolus_delivered, resultBolusDelivered)
-                                        replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                        if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                            replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                         lastRemoteBolusTime = dateUtil.now()
                                         if (isMeal) {
                                             profileFunction.getProfile()?.let { currentProfile ->
@@ -1020,11 +1026,12 @@ class SmsCommunicatorPlugin @Inject constructor(
                                                 replyText += "\n" + rh.gs(R.string.smscommunicator_meal_bolus_delivered_tt, tt, eatingSoonTTDuration)
                                             }
                                         }
-                                        sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                        sendReport(receivedSms.phoneNumber, replyText)
                                         uel.log(Action.BOLUS, Sources.SMS, replyText)
                                     } else {
                                         var replyText = rh.gs(R.string.smscommunicator_bolus_failed)
-                                        replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                        if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                            replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                         sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                         uel.log(
                                             Action.BOLUS, Sources.SMS, pumpStatusProvider.shortStatus(true) + "\n" + rh.gs(R.string.smscommunicator_bolus_failed),
@@ -1083,16 +1090,15 @@ class SmsCommunicatorPlugin @Inject constructor(
                     commandQueue.bolus(detailedBolusInfo, object : Callback() {
                         override fun run() {
                             if (result.success) {
-                                var replyText = rh.gs(R.string.smscommunicator_carbs_set, anInteger)
-                                replyText += "\n" + pumpStatusProvider.shortStatus(true)
-                                sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                                sendReport(receivedSms.phoneNumber, rh.gs(R.string.smscommunicator_carbs_set, anInteger), true)
                                 uel.log(
                                     Action.CARBS, Sources.SMS, pumpStatusProvider.shortStatus(true) + ": " + rh.gs(R.string.smscommunicator_carbs_set, anInteger),
                                     ValueWithUnit.Gram(anInteger ?: 0)
                                 )
                             } else {
                                 var replyText = rh.gs(R.string.smscommunicator_carbs_failed, anInteger)
-                                replyText += "\n" + pumpStatusProvider.shortStatus(true)
+                                if (preferences.get(BooleanKey.SmsAddPumpStatus))
+                                    replyText += "\n" + pumpStatusProvider.shortStatus(true)
                                 sendSMS(Sms(receivedSms.phoneNumber, replyText))
                                 uel.log(
                                     Action.CARBS, Sources.SMS, pumpStatusProvider.shortStatus(true) + ": " + rh.gs(R.string.smscommunicator_carbs_failed, anInteger),
@@ -1157,8 +1163,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                         )
                     ).subscribe()
                     val ttString = if (units == GlucoseUnit.MMOL) decimalFormatter.to1Decimal(tt) else decimalFormatter.to0Decimal(tt)
-                    val replyText = rh.gs(R.string.smscommunicator_tt_set, ttString, ttDuration)
-                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                    sendReport(receivedSms.phoneNumber, rh.gs(R.string.smscommunicator_tt_set, ttString, ttDuration))
                 }
             })
         } else if (isStop) {
@@ -1174,8 +1179,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                         note = rh.gs(R.string.smscommunicator_tt_canceled),
                         listValues = listOf(ValueWithUnit.SimpleString(rh.gsNotLocalised(R.string.smscommunicator_tt_canceled)))
                     ).subscribe()
-                    val replyText = rh.gs(R.string.smscommunicator_tt_canceled)
-                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                    sendReport(receivedSms.phoneNumber, rh.gs(R.string.smscommunicator_tt_canceled))
                     uel.log(
                         Action.CANCEL_TT, Sources.SMS, rh.gs(R.string.smscommunicator_tt_canceled),
                         ValueWithUnit.SimpleString(rh.gsNotLocalised(R.string.smscommunicator_tt_canceled))
@@ -1196,8 +1200,7 @@ class SmsCommunicatorPlugin @Inject constructor(
             messageToConfirm = authRequestProvider.get().with(receivedSms, reply, passCode, object : SmsAction(pumpCommand = false) {
                 override fun run() {
                     preferences.put(BooleanKey.SmsAllowRemoteCommands, false)
-                    val replyText = rh.gs(R.string.smscommunicator_stopped_sms)
-                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                    sendReport(receivedSms.phoneNumber, rh.gs(R.string.smscommunicator_stopped_sms))
                     uel.log(
                         Action.STOP_SMS, Sources.SMS, rh.gs(R.string.smscommunicator_stopped_sms),
                         ValueWithUnit.SimpleString(rh.gsNotLocalised(R.string.smscommunicator_stopped_sms))
@@ -1217,8 +1220,9 @@ class SmsCommunicatorPlugin @Inject constructor(
                 override fun run() {
                     val result = xDripBroadcast.sendCalibration(aDouble!!)
                     val replyText =
-                        if (result) rh.gs(R.string.smscommunicator_calibration_sent) else rh.gs(R.string.smscommunicator_calibration_failed)
-                    sendSMSToAllNumbers(Sms(receivedSms.phoneNumber, replyText))
+                        if (result) rh.gs(R.string.smscommunicator_calibration_sent)
+                        else rh.gs(R.string.smscommunicator_calibration_failed)
+                    sendReport(receivedSms.phoneNumber, replyText)
                     if (result)
                         uel.log(
                             Action.CALIBRATION, Sources.SMS, rh.gs(R.string.smscommunicator_calibration_sent),
@@ -1249,19 +1253,32 @@ class SmsCommunicatorPlugin @Inject constructor(
         }
     }
 
+    private fun sendReport(senderNumber: String, replyText: String, tryAddingPumpStatus: Boolean = false) {
+        val message =
+            if (tryAddingPumpStatus && preferences.get(BooleanKey.SmsAddPumpStatus)) replyText + "\n" + pumpStatusProvider.shortStatus(true)
+            else replyText
+        val sms = Sms(senderNumber, message)
+        if (preferences.get(BooleanKey.SmsReportToAll)) sendSMSToAllNumbers(sms)
+        else sendSMS(sms)
+    }
+
     override fun sendSMS(sms: Sms): Boolean {
         sms.text = stripAccents(sms.text)
 
+        if (smsManager == null) {
+            val notification = Notification(Notification.URGENT, rh.gs(app.aaps.core.ui.R.string.smscommunicator_missingsmspermission), Notification.NORMAL)
+            rxBus.send(EventNewNotification(notification))
+            aapsLogger.debug(LTag.SMS, "Couldn't send any SMS - smsManager is null!")
+            return false
+        }
+
         try {
             aapsLogger.debug(LTag.SMS, "Sending SMS to " + sms.phoneNumber + ": " + sms.text)
-            if (sms.text.toByteArray().size <= 140) smsManager?.sendTextMessage(sms.phoneNumber, null, sms.text, null, null)
-            else {
-                val parts = smsManager?.divideMessage(sms.text)
-                smsManager?.sendMultipartTextMessage(
-                    sms.phoneNumber, null, parts,
-                    null, null
-                )
-            }
+            val parts = smsManager?.divideMessage(sms.text)
+            smsManager?.sendMultipartTextMessage(
+                sms.phoneNumber, null, parts,
+                null, null
+            )
             messages.add(sms)
         } catch (e: IllegalArgumentException) {
             return if (e.message == "Invalid message body") {
@@ -1282,8 +1299,17 @@ class SmsCommunicatorPlugin @Inject constructor(
         return true
     }
 
-    private fun generatePassCode(): String =
-        rh.gs(R.string.smscommunicator_code_from_authenticator_for, otp.name())
+    private fun generatePassCode(): String {
+        if (otp.isEnabled()) {
+            // this not realy generate password - rather info to use Authenticator TOTP instead
+            return rh.gs(R.string.smscommunicator_code_from_authenticator_for, otp.name())
+        }
+
+        var passCode = ""
+        for (i in 1..3)
+            passCode += Char(('A'.code + (Math.random() * ('z' - 'a' + 1)).toInt()))
+        return passCode.replace('l', 'k').replace('I', 'J')
+    }
 
     private fun stripAccents(str: String): String {
         var s = str
@@ -1324,6 +1350,10 @@ class SmsCommunicatorPlugin @Inject constructor(
                 )
             )
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsAllowRemoteCommands, title = R.string.smscommunicator_remote_commands_allowed))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsReportProfileSwitch, title = R.string.sms_notify_about_profile_switch))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsReportPumpUnreachable, summary = R.string.smscommunicator_report_pump_unreachable_summary, title = R.string.smscommunicator_pump_unreachable))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsAddPumpStatus, title = R.string.smscommunicator_add_pump_status))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsReportToAll, title = R.string.smscommunicator_report_to_all, summary = R.string.smscommunicator_report_to_all_summary))
             addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.SmsRemoteBolusDistance, summary = R.string.smscommunicator_remote_bolus_min_distance_summary, title = R.string.smscommunicator_remote_bolus_min_distance))
             addPreference(
                 AdaptiveStringPreference(
@@ -1331,6 +1361,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                     validatorParams = DefaultEditTextValidator.Parameters(testType = EditTextValidator.TEST_PIN_STRENGTH)
                 )
             )
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsEnableOtp, title = R.string.smscommunicator_otp_enabled, summary = R.string.smscommunicator_otp_enabled_summary))
             addPreference(
                 AdaptiveIntentPreference(
                     ctx = context,
@@ -1339,7 +1370,6 @@ class SmsCommunicatorPlugin @Inject constructor(
                     intent = Intent().apply { action = SmsCommunicatorOtpActivity::class.java.name }
                 )
             )
-            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.SmsReportPumpUnreachable, summary = R.string.smscommunicator_report_pump_unreachable_summary, title = R.string.smscommunicator_pump_unreachable))
         }
     }
 }

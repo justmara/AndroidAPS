@@ -11,6 +11,7 @@ interface FileListProvider {
     fun ensureExportDirExists(): DocumentFile?
     fun ensureTempDirExists(): DocumentFile?
     fun ensureExtraDirExists(): DocumentFile?
+    fun ensureLogsDirExists(): DocumentFile?
 
     fun newPreferenceFile(): DocumentFile?
     fun newExportCsvFile(): DocumentFile?

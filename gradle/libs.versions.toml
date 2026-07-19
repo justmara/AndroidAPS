@@ -101,6 +101,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.7.0" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment-ktx", version = "1.8.9" }
 androidx-gridlayout = { group = "androidx.gridlayout", name = "gridlayout", version = "1.1.0" }
+androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version = "1.1.0" }
 androidx-legacy-support = { group = "androidx.legacy", name = "legacy-support-v13", version = "1.0.0" }
 androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version = "2.10.0" }
 androidx-media3-common = { group = "androidx.media3", name = "media3-common", version = "1.9.0" }

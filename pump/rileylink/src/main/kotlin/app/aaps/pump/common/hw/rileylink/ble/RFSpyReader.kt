@@ -61,6 +61,7 @@ class RFSpyReader internal constructor(private val aapsLogger: AAPSLogger, priva
         executor.execute {
             val serviceUUID = UUID.fromString(GattAttributes.SERVICE_RADIO)
             val radioDataUUID = UUID.fromString(GattAttributes.CHARA_RADIO_DATA)
+
             while (true) {
                 try {
                     acquireCount++

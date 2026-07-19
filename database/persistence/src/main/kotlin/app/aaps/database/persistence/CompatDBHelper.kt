@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.rx.events.EventProfileSwitchChanged
 import app.aaps.core.interfaces.rx.events.EventRunningModeChange
 import app.aaps.core.interfaces.rx.events.EventTempBasalChange
 import app.aaps.core.interfaces.rx.events.EventTempTargetChange
+import app.aaps.core.interfaces.rx.events.EventCalibrationDetected
 import app.aaps.core.interfaces.rx.events.EventTherapyEventChange
 import app.aaps.core.interfaces.rx.events.EventTreatmentChange
 import app.aaps.core.interfaces.ui.UiInteraction
@@ -51,6 +52,13 @@ class CompatDBHelper @Inject constructor(
             uiInteraction.updateWidget(context, "OnStart")
         }
         .subscribe {
+            it.forEach { e ->
+                aapsLogger.debug(LTag.DATABASE, "Got ${e.javaClass.name}")
+            }
+            it.filterIsInstance<Bolus>().forEach { b ->
+                aapsLogger.debug(LTag.DATABASE, "Got bolus(${b.id}) on ${b.timestamp} of ${b.amount}U")
+            }
+
             /**
              * GlucoseValues can come in batch
              * oldest one should be used for invalidation, newest one for for triggering Loop.
@@ -104,6 +112,10 @@ class CompatDBHelper @Inject constructor(
             it.filterIsInstance<TherapyEvent>().firstOrNull()?.let { te ->
                 aapsLogger.debug(LTag.DATABASE, "Firing EventTherapyEventChange $te")
                 rxBus.send(EventTherapyEventChange())
+                if (te.type == TherapyEvent.Type.FINGER_STICK_BG_VALUE) {
+                    aapsLogger.debug(LTag.DATABASE, "Firing EventCalibrationDetected")
+                    rxBus.send(EventCalibrationDetected())
+                }
             }
             it.filterIsInstance<Food>().firstOrNull()?.let { food ->
                 aapsLogger.debug(LTag.DATABASE, "Firing EventFoodDatabaseChanged $food")

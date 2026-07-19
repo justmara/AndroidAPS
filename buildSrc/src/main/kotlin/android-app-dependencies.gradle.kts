@@ -8,7 +8,7 @@ android {
     defaultConfig {
         multiDexEnabled = true
         versionCode = Versions.versionCode
-        version = Versions.appVersion
+        version = Versions.buildName
 
         // Removed after Dagger injection setup in instrumentation tests
         //testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

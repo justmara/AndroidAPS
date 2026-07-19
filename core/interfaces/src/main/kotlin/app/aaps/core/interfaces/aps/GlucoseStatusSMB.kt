@@ -10,4 +10,5 @@ data class GlucoseStatusSMB(
     override val shortAvgDelta: Double = 0.0,
     override val longAvgDelta: Double = 0.0,
     override val date: Long = 0L,
+    override val bgAcceleration: Double = 0.0,
 ) : GlucoseStatus

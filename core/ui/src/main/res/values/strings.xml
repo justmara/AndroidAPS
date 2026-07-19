@@ -639,6 +639,7 @@
 
     <!-- SmsCommunicator -->
     <string name="smscommunicator_missingsmspermission">Missing SMS permission</string>
+    <string name="smscommunicator_internal_error">Internal error while sending SMS</string>
 
     <!-- About -->
     <string name="cta_dont_kill_my_app_info">Don\'t kill my app?</string>

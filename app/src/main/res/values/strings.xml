@@ -24,6 +24,8 @@
     <string name="authorizationfailed">Authorization failed</string>
     <string name="cannula">Cannula</string>
     <string name="identification_not_set">Identification not set in dev mode</string>
+    <string name="disable_updates_checker">Do not check for updates</string>
+    <string name="enable_engineering_mode">Enable engineering mode</string>
     <!-- WEAR OS-->
     <string name="remove_selected_items">Remove selected items</string>
     <string name="count_selected">%1$d selected</string>

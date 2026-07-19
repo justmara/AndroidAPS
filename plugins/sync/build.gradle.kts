@@ -47,6 +47,9 @@ dependencies {
     api(libs.com.google.code.gson)
     api(libs.net.openid.appauth)
 
+    // Health Connect (steps / heart rate fallback for the overview graph)
+    api(libs.androidx.health.connect)
+
     // DataLayerListenerService
     api(libs.com.google.android.gms.playservices.wearable)
 

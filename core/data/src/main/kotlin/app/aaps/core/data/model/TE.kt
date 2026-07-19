@@ -168,5 +168,9 @@ data class TE(
         }
     }
 
-    companion object
+    companion object {
+
+        /** [enteredBy] marker tagging a NOTE created by an AAPS local-profile parameter edit. */
+        const val ENTERED_BY_PROFILE_EDIT = "ProfileChange"
+    }
 }

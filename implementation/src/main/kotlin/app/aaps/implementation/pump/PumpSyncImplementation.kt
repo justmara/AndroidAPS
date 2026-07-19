@@ -152,6 +152,7 @@ class PumpSyncImplementation @Inject constructor(
 
     override fun addBolusWithTempId(timestamp: Long, amount: Double, temporaryId: Long, type: BS.Type, pumpType: PumpType, pumpSerial: String): Boolean {
         if (!confirmActivePump(timestamp, pumpType, pumpSerial)) return false
+        aapsLogger.debug(LTag.PUMP, "addBolusWithTempId ts=$timestamp, tempId=$temporaryId, amount=$amount, type=$type, pumpType=$pumpType, pumpSerial=$pumpSerial")
         val bolus = BS(
             timestamp = timestamp,
             amount = amount,
@@ -169,6 +170,7 @@ class PumpSyncImplementation @Inject constructor(
 
     override fun syncBolusWithTempId(timestamp: Long, amount: Double, temporaryId: Long, type: BS.Type?, pumpId: Long?, pumpType: PumpType, pumpSerial: String): Boolean {
         if (!confirmActivePump(timestamp, pumpType, pumpSerial)) return false
+        aapsLogger.debug(LTag.PUMP, "syncBolusWithTempId ts=$timestamp, tempId=$temporaryId, amount=$amount, type=$type, pumpId=$pumpId, pumpType=$pumpType, pumpSerial=$pumpSerial")
         val bolus = BS(
             timestamp = timestamp,
             amount = amount,
@@ -187,6 +189,7 @@ class PumpSyncImplementation @Inject constructor(
 
     override fun syncBolusWithPumpId(timestamp: Long, amount: Double, type: BS.Type?, pumpId: Long, pumpType: PumpType, pumpSerial: String): Boolean {
         if (!confirmActivePump(timestamp, pumpType, pumpSerial)) return false
+        aapsLogger.debug(LTag.PUMP, "syncBolusWithPumpId ts=$timestamp, amount=$amount, type=$type, pumpId=$pumpId, pumpType=$pumpType, pumpSerial=$pumpSerial")
         val bolus = BS(
             timestamp = timestamp,
             amount = amount,

@@ -32,10 +32,12 @@ import app.aaps.core.validators.validators.PersonNameValidator
 import app.aaps.core.validators.validators.PhoneValidator
 import app.aaps.core.validators.validators.PinStrengthValidator
 import app.aaps.core.validators.validators.RegexpValidator
+import app.aaps.core.validators.validators.TimeValidator
 import app.aaps.core.validators.validators.Validator
 import app.aaps.core.validators.validators.WebUrlValidator
 import com.google.android.material.textfield.TextInputLayout
 import dagger.android.HasAndroidInjector
+import java.lang.ref.WeakReference
 import javax.inject.Inject
 
 @Suppress("SpellCheckingInspection")
@@ -44,7 +46,14 @@ class DefaultEditTextValidator : EditTextValidator {
     private var mValidator: MultiValidator? = null
     private var testErrorString: String? = null
     private var emptyAllowed = false
-    private lateinit var editTextView: EditText
+
+    // Hold the dialog's EditText weakly: an Adaptive*Preference stores this validator in a long-lived
+    // field and recreates it on every dialog open, so a strong reference would pin the dismissed
+    // EditText (and its whole AlertDialog + EditTextPreferenceDialogFragmentCompat) until the user
+    // leaves the Preferences screen (LeakCanary leak). The EditText stays strongly reachable via the
+    // fragment's own field while the dialog is open, so validation on the OK path still works.
+    private var editTextViewRef: WeakReference<EditText> = WeakReference(null)
+    private val editTextView: EditText? get() = editTextViewRef.get()
     private var defaultEmptyErrorString: String? = null
 
     private var testType: Int
@@ -98,7 +107,7 @@ class DefaultEditTextValidator : EditTextValidator {
     }
 
     private fun setEditText(editText: EditText) {
-        editTextView = editText
+        editTextViewRef = WeakReference(editText)
         editText.addTextChangedListener(textWatcher)
         editText.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(view: View) {}
@@ -120,12 +129,13 @@ class DefaultEditTextValidator : EditTextValidator {
             }
 
             override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
+                val et = editTextView ?: return
                 if (!TextUtils.isEmpty(s) && isErrorShown) {
                     try {
-                        val textInputLayout = editTextView.parent as TextInputLayout
+                        val textInputLayout = et.parent as TextInputLayout
                         textInputLayout.isErrorEnabled = false
                     } catch (_: Throwable) {
-                        editTextView.error = null
+                        et.error = null
                     }
                 }
             }
@@ -208,7 +218,7 @@ class DefaultEditTextValidator : EditTextValidator {
                         throw RuntimeException(String.format("Unable to construct custom validator (%s) with argument: %s", classType, testErrorString))
                     }
                 }
-
+                EditTextValidator.TEST_TIME                -> TimeValidator(if (TextUtils.isEmpty(testErrorString)) context.getString(R.string.error_time_not_valid) else testErrorString)
                 EditTextValidator.TEST_DATE                -> DateValidator(if (TextUtils.isEmpty(testErrorString)) context.getString(R.string.error_date_not_valid) else testErrorString, customFormat)
                 else                                       -> DummyValidator()
             }
@@ -275,7 +285,8 @@ class DefaultEditTextValidator : EditTextValidator {
     }
 
     override fun testValidity(showUIError: Boolean): Boolean {
-        val isValid = mValidator?.isValid(editTextView) == true
+        val et = editTextView ?: return true // dialog already gone; nothing to validate
+        val isValid = mValidator?.isValid(et) == true
         if (!isValid && showUIError) {
             showUIError()
         }
@@ -283,14 +294,15 @@ class DefaultEditTextValidator : EditTextValidator {
     }
 
     override fun showUIError() {
+        val et = editTextView ?: return
         mValidator?.let { mValidator ->
             if (mValidator.hasErrorMessage()) {
                 try {
-                    val parent = editTextView.parent as TextInputLayout
+                    val parent = et.parent as TextInputLayout
                     parent.isErrorEnabled = true
                     parent.error = mValidator.errorMessage
                 } catch (_: Throwable) {
-                    editTextView.error = mValidator.errorMessage
+                    et.error = mValidator.errorMessage
                 }
             }
         }
@@ -298,11 +310,14 @@ class DefaultEditTextValidator : EditTextValidator {
 
     // might sound like a bug. but there's no way to know if the error is shown (not with public api)
     val isErrorShown: Boolean
-        get() = try {
-            editTextView.parent as TextInputLayout
-            true // might sound like a bug. but there's no way to know if the error is shown (not with public api)
-        } catch (_: Throwable) {
-            !TextUtils.isEmpty(editTextView.error)
+        get() {
+            val et = editTextView ?: return false
+            return try {
+                et.parent as TextInputLayout
+                true // might sound like a bug. but there's no way to know if the error is shown (not with public api)
+            } catch (_: Throwable) {
+                !TextUtils.isEmpty(et.error)
+            }
         }
 
     @Suppress("SpellCheckingInspection")

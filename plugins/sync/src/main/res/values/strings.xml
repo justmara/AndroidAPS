@@ -75,6 +75,7 @@
     <string name="copy_existing_values">Copy NS settings (if exists)?</string>
     <string name="ns_use_ws_title">Connect to websockets</string>
     <string name="ns_use_ws_summary">Enabling means: faster updates, receiving alarms and announcements and higher battery consumption similar to v1. All other uploaders to NS must use v3 protocol.</string>
+    <string name="ns_ignore_errors">Ignore sync errors</string>
 
     <!-- Tidepool -->
     <string name="summary_tidepool_dev_servers">If enabled, uploads will go to test servers instead of the regular</string>
@@ -120,7 +121,7 @@
     <string name="no_watch_connected">(No Watch Connected)</string>
     <string name="pump_status">Pump status</string>
     <string name="loop_status">Loop status</string>
-    <string name="wizard_result">Calc. Wizard:\nInsulin: %1$.2fU\nCarbs: %2$dg</string>
+    <string name="wizard_result">Calc. Wizard:\nInsulin: %1$.2fU\nCarbs: %2$dg\nCarb time: %3$dmin</string>
     <string name="quick_wizard_not_available">Selected quickwizard no longer available, please refresh your tile</string>
     <string name="quick_wizard_message">QuickWizard: %1$s\nInsulin: %2$.2fU\nCarbs: %3$dg</string>
     <string name="user_action_not_available">Selected User Action %1$s is no longer available, please refresh your tile</string>
@@ -208,5 +209,8 @@
     <string name="wear_action_loop_state_now_pump_disconnected">Pump disconnected</string>
     <string name="garmin_request_key">Request Key</string>
     <string name="garmin_request_key_summary">Optional key to secure HTTP communication between Garmin device and AAPS.</string>
+    <string name="health_connect_granted">Health Connect permissions granted</string>
+    <string name="health_connect_not_granted">Health Connect permissions not granted</string>
+    <string name="health_connect_unavailable">Health Connect is not available on this device</string>
 
 </resources>

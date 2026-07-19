@@ -28,6 +28,8 @@ import app.aaps.core.interfaces.rx.events.EventRefreshOverview
 import app.aaps.core.interfaces.ui.IconsProvider
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.extensions.generateCOBString
 import app.aaps.core.objects.extensions.round
 import app.aaps.core.objects.extensions.toStringShort
@@ -56,6 +58,7 @@ class PersistentNotificationPlugin @Inject constructor(
     private val iconsProvider: IconsProvider,
     private val glucoseStatusProvider: GlucoseStatusProvider,
     private val config: Config,
+    private val preferences: Preferences,
     private val decimalFormatter: DecimalFormatter
 ) : PluginBase(
     PluginDescription()
@@ -142,8 +145,11 @@ class PersistentNotificationPlugin @Inject constructor(
             }
             val activeTemp = processedTbrEbData.getTempBasalIncludingConvertedExtended(System.currentTimeMillis())
             if (activeTemp != null) {
-                line1 += "  " + activeTemp.toStringShort(rh)
-                line1aa += "  " + activeTemp.toStringShort(rh) + "."
+                val usePercentage = preferences.get(BooleanKey.OverviewBasalIsAlwaysNotAbsolute)
+                val profileBasal = profileFunction.getProfile()?.getBasal() ?: 0.0
+                val tempText = activeTemp.toStringShort(usePercentage, profileBasal, rh)
+                line1 += "  $tempText"
+                line1aa += "  $tempText."
             }
             //IOB
             val bolusIob = iobCobCalculator.calculateIobFromBolus().round()

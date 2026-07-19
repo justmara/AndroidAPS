@@ -28,6 +28,8 @@
     <string name="smscommunicator_otp_verification_ivalid_size">НЕВЕРНЫЙ РАЗМЕР!</string>
     <string name="smscommunicator_otp_verification_wrong_pin">НЕВЕРНЫЙ PIN-КОД</string>
     <string name="smscommunicator_otp_verification_wrong_otp">НЕВЕРНЫЙ РАЗОВЫЙ КОД</string>
+    <string name="smscommunicator_otp_enabled">Включить Аутентификатор</string>
+    <string name="smscommunicator_otp_enabled_summary">Авторизовывать команды используя одноразовые пароли из Google Authenticator или схожих приложений для 2FA.</string>
     <string name="sms_wrong_code">Неверный код. Команда отменена.</string>
     <string name="sms_timeout_while_waiting">Время ожидания окончания предыдущего соединения с помпой истекло</string>
     <string name="smscommunicator_allowednumbers">разрешенные телефонные номера</string>
@@ -49,6 +51,9 @@
     <string name="smscommunicator_tt_set">Цель %1$s на %2$d минут установлена успешно</string>
     <string name="smscommunicator_tt_canceled">Временная цель успешно отменена</string>
     <string name="smscommunicator_remote_commands_allowed">Разрешить команды через смс</string>
+    <string name="smscommunicator_add_pump_status">Добавлять статус помпы в ответ</string>
+    <string name="smscommunicator_report_to_all">Отправлять отчет всем</string>
+    <string name="smscommunicator_report_to_all_summary">Выключение этой опции будет сообщать результат команды только ее отправителю</string>
     <string name="smscommunicator_loop_has_been_disabled">Зцикл остановлен</string>
     <string name="smscommunicator_loop_is_enabled">Зцикл работает</string>
     <string name="smscommunicator_pump_connect_with_code">Чтобы подсоединить помпу ответьте кодом %1$s</string>
@@ -80,7 +85,7 @@
     <string name="smscommunicator_extended_stop_reply_with_code">Для прекращения подачи пролонгированного болюса ответьте кодом %1$s</string>
     <string name="smscommunicator_tempbasal_canceled">Временный базал отменен</string>
     <string name="smscommunicator_extended_canceled">Пролонгированный болюс отменен</string>
-    <string name="smscommunicator_tempbasal_cancel_failed">Отмена врем базала не состоялась</string>
+    <string name="smscommunicator_tempbasal_cancel_failed">Отмена TBR не состоялась</string>
     <string name="smscommunicator_extended_cancel_failed">Сбой отмены пролонгированного болюса</string>
     <string name="smscommunicator_unknown_command">Неизвестная команда или неверный ответ</string>
     <string name="smscommunicator_another_bolus_in_queue">В очереди есть еще один болюс. Повторите попытку позже.</string>
@@ -100,14 +105,15 @@
     <string name="sms_actual_bg">ГК:</string>
     <string name="sms_last_bg">Предыдущая ГК:</string>
     <string name="sms_delta">дельта:</string>
-    <string name="sms_iob">IOB: активный инсулин</string>
-    <string name="sms_bolus">болюс:</string>
-    <string name="sms_basal">базал: </string>
+    <string name="sms_iob">IOB:</string>
+    <string name="sms_bolus">Болюс:</string>
+    <string name="sms_basal">Базал:</string>
     <string name="sms_min_ago">%1$dмин. назад</string>
     <string name="sms_loop_suspended_for">Остановлен (на %1$d мин)</string>
     <string name="sms_read_status_failed">Статус чтения: неудача</string>
     <string name="sms_profile_switch_created">Переключатель профиля создан</string>
-    <string name="sms_wrong_tbr_duration">Длительность временного базала TBR должна быть кратной %1$d минутам и больше 0.</string>
+    <string name="sms_wrong_tbr_duration">Длительность TBR должна быть кратной %1$d минутам и больше 0.</string>
+    <string name="sms_notify_about_profile_switch">Уведомлять о смене профиля</string>
     <string name="a11y_otp_qr_code">QR код для создания одноразового пароля</string>
     <string name="disabled_loop">Зцикл не работает</string>
     <!-- Food-->
@@ -138,10 +144,10 @@
     <string name="delete_current_profile">Удалить текущий профиль?</string>
     <string name="units_colon">Единицы:</string>
     <string name="missing_profile_name">Отсутствует название профиля</string>
-    <string name="error_in_ic_values">Ошибка в значении углеводного коэффициента IC</string>
+    <string name="error_in_ic_values">Ошибка в значении IC</string>
     <string name="error_in_basal_values">Ошибка в величине базала</string>
     <string name="error_in_target_values">Ошибка в целевых значениях</string>
-    <string name="error_in_isf_values">Ошибка в значении фактора чувствительности к инсулину ISF</string>
+    <string name="error_in_isf_values">Ошибка в значении ISF</string>
     <string name="profile_name_contains_dot">В некоторых наименованиях профиля содержатся точки.\nЭто не поддерживается NS.\nПрофиль не выгружен в NS.</string>
     <string name="invalid_profile_not_accepted">Неверный профиль %1$s не принят из NS</string>
     <string name="view">Смотреть</string>
@@ -151,7 +157,7 @@
     <string name="a11y_add_new_profile">добавить новый профиль</string>
     <string name="a11y_clone_profile">клонировать текущий профиль</string>
     <string name="a11y_delete_current_profile">удалить текущий профиль</string>
-    <string name="dia_short">Время действия инсулина DIA</string>
+    <string name="dia_short">DIA</string>
     <string name="target_short">ЦЕЛЬ</string>
     <string name="basal_short">БАЗАЛ</string>
     <string name="isf_dynamic_label_warning">Алгоритм может обеспечить динамический расчет ISF. Значения ниже можно использовать только в качестве запасного варианта в случае отсутствия данных или только в качестве эталонного значения</string>
@@ -159,16 +165,16 @@
     <!-- Actions -->
     <string name="actions">Действия</string>
     <string name="description_actions">Кнопки быстрого доступа к некоторым распространенным настройкам</string>
-    <string name="actions_shortname">ДЕЙСТВ</string>
-    <string name="tempbasal_button">ВремБазал</string>
+    <string name="actions_shortname">ДЕЙ</string>
+    <string name="tempbasal_button">TBR</string>
     <string name="extended_bolus_button">Пролонгированный болюс</string>
     <string name="extended_bolus_cancel_button">Отменить пролонгированный болюс</string>
     <string name="tools">Инструменты</string>
     <string name="site_rotation">Вращение места установки</string>
     <string name="nav_history_browser">Просмотр журнала</string>
     <string name="sensor_label">Сенсор</string>
-    <string name="age_label">возраст:</string>
-    <string name="level_label">уровень:</string>
+    <string name="age_label">Возраст:</string>
+    <string name="level_label">Уровень:</string>
     <string name="insulin_label">Инсулин</string>
     <string name="pb_label">Батарея помпы</string>
     <string name="cannula">Катетер помпы</string>
@@ -201,18 +207,18 @@
     <string name="graph_long_scale_12h">12 часов</string>
     <string name="graph_long_scale_18h">18 часов</string>
     <string name="graph_long_scale_24h">24 часа</string>
-    <string name="a11y_graph">график</string>
-    <string name="a11y_graph_scale">выберите масштаб графика</string>
+    <string name="a11y_graph">График</string>
+    <string name="a11y_graph_scale">Выберите масштаб графика</string>
     <string name="a11y_graph_scale_6h">масштаб шкалы 6 часов</string>
     <string name="a11y_graph_scale_12h">масштаб шкалы 12 часов</string>
     <string name="a11y_graph_scale_18h">масштаб шкалы 18 часов</string>
     <string name="a11y_graph_scale_24h">масштаб шкалы 24 часа</string>
     <string name="a11y_insulin_label">инсулин</string>
     <string name="chart_menu">Меню графика</string>
-    <string name="a11y_bg_quality">качество ГК</string>
-    <string name="a11y_blood_glucose">уровень глюкозы в крови ГК</string>
-    <string name="a11y_bg_outdated">устаревшие данные</string>
-    <string name="set_basal_question">Принять новый врем базал:</string>
+    <string name="a11y_bg_quality">Качество ГК</string>
+    <string name="a11y_blood_glucose">Уровень ГК</string>
+    <string name="a11y_bg_outdated">Устаревшие данные</string>
+    <string name="set_basal_question">Принять новый TBR:</string>
     <string name="overview_cgm">Непрерывный мониторинг ГК</string>
     <string name="overview">Начало</string>
     <string name="overview_shortname">НАЧАЛО</string>
@@ -221,8 +227,8 @@
     <string name="show_calibration_button_summary">Отправляет калибровку xDrip+ (убедитесь, что параметр \'Принимать калибровки\' включен в xDrip+ в Настройках между приложениями).</string>
     <string name="show_cgm_button_summary">Открывает приложение xDrip+ или Dexcom (можно использовать кнопку \"Назад\" для возврата к AAPS).</string>
     <string name="not_available_full">Недоступно</string>
-    <string name="constraints_violation">ограничение нарушено</string>
-    <string name="change_your_input">измените введенные данные</string>
+    <string name="constraints_violation">Ограничение нарушено</string>
+    <string name="change_your_input">Измените введенные данные</string>
     <string name="openaps">OpenAPS</string>
     <string name="uploader">Загрузчик</string>
     <string name="data_status">Состояние данных ГК</string>
@@ -252,7 +258,7 @@
     <string name="button3">Кнопка 3</string>
     <string name="prefs_range_title">Диапазон для визуализации</string>
     <string name="prefs_range_summary">Нижняя и верхняя граница графиков на начальном экране и на смарт-часах</string>
-    <string name="low_mark">отметка НИЗКИЙ</string>
+    <string name="low_mark">Отметка НИЗКИЙ</string>
     <string name="high_mark">Отметка ВЫСОКИЙ</string>
     <string name="short_tabtitles">Сокращенные наименования вкладок</string>
     <string name="overview_show_notes_field_in_dialogs_title">Показать поле примечаний в диалогах терапии</string>
@@ -265,6 +271,8 @@
     <string name="enablebolusreminder">Включить напоминание о болюсе</string>
     <string name="enablebolusreminder_summary">Напомнить о подаче болюса позднее в мастере (постболюс)</string>
     <string name="run_question">Запустить %s?</string>
+    <string name="recalc_on_temp_target_title">Запускать перерасчёт СРАЗУ после ВЦ</string>
+    <string name="recalc_on_temp_target_summary">При установке, отмене или изменении временной цели сразу запускать перерасчёт (и при необходимости отправлять команду на помпу), а также обновлять линию цели на графике. По умолчанию выключено.</string>
     <!--    OverviewMenu-->
     <string name="overview_show_predictions">Прогнозирование</string>
     <string name="overview_show_treatments">Терапия</string>
@@ -274,25 +282,25 @@
     <string name="overview_show_bgi">Влияние ГК</string>
     <string name="overview_show_sensitivity">Изменение чувствительности</string>
     <string name="overview_show_deviations">Отклонение</string>
-    <string name="overview_show_cob">Активные углеводы COB</string>
-    <string name="overview_show_iob">Активный инсулин IOB</string>
+    <string name="overview_show_cob">COB</string>
+    <string name="overview_show_iob">IOB</string>
     <string name="overview_show_basals">Базал</string>
     <string name="overview_show_abs_insulin">Абсолютный инсулин</string>
     <string name="overview_show_variable_sens">Переменная чувствительность</string>
     <string name="prediction_shortname">ОЖИД</string>
     <string name="basal_shortname">БАЗ</string>
-    <string name="deviation_shortname">ОТКЛН</string>
+    <string name="deviation_shortname">ОТКЛ</string>
     <string name="activity_shortname">НАГР</string>
     <string name="bgi_shortname">-BGI</string>
-    <string name="abs_insulin_shortname">НАДО</string>
+    <string name="abs_insulin_shortname">АИНС</string>
     <string name="devslope_shortname">ЛИНОТКЛН</string>
     <string name="treatments_shortname">НАЗНАЧ</string>
     <string name="heartRate_shortname">ЧСС</string>
-    <string name="sensitivity_shortname">ЧУВСТВ%</string>
-    <string name="variable_sensitivity_shortname">ПЕРЕМЧУВСТВ</string>
+    <string name="sensitivity_shortname">ЧУВСТ%</string>
+    <string name="variable_sensitivity_shortname">ПЕРЧУВСТ</string>
     <string name="graph_scale">Масштаб графика</string>
     <string name="graph_menu_divider_header">График</string>
-    <string name="temp_basal_overview_short_name">ВРЕМ:</string>
+    <string name="temp_basal_overview_short_name">Т:</string>
     <!-- Skins -->
     <string name="classic_description">Исходная тема оформления</string>
     <string name="lowres_description">Тема для низкого разрешения</string>
@@ -304,7 +312,8 @@
     <!--    PersistentNotification-->
     <string name="description_persistent_notification">Показывает текущие уведомления и краткий обзор событий цикла</string>
     <string name="old_data">старые данные</string>
-    <string name="overview_show_steps">Действия</string>
+    <string name="overview_show_steps">Шаги</string>
     <string name="steps_shortname">ШАГИ</string>
     <string name="simple_mode_enabled">Простой режим включен</string>
+    <string name="overview_basal_always_absolute">Всегда отображать TBR в %</string>
 </resources>

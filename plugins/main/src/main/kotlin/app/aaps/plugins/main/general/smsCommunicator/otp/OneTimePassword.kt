@@ -4,12 +4,14 @@ import android.util.Base64
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import com.eatthepath.otp.HmacOneTimePasswordGenerator
 import com.google.common.io.BaseEncoding
 import java.net.URLEncoder
+import java.security.MessageDigest
 import java.util.Locale
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -30,6 +32,10 @@ class OneTimePassword @Inject constructor(
 
     init {
         configure()
+    }
+
+    fun isEnabled(): Boolean {
+        return preferences.get(BooleanKey.SmsEnableOtp)
     }
 
     /**
@@ -89,7 +95,8 @@ class OneTimePassword @Inject constructor(
             return OneTimePasswordValidationResult.ERROR_WRONG_LENGTH
         }
 
-        if (normalisedOtp.substring(6) != pin) {
+        // Constant-time compare of the security-gating PIN (length already validated above).
+        if (!MessageDigest.isEqual(normalisedOtp.substring(6).toByteArray(), pin.toByteArray())) {
             return OneTimePasswordValidationResult.ERROR_WRONG_PIN
         }
 
@@ -101,7 +108,7 @@ class OneTimePassword @Inject constructor(
         }
         val candidateOtp = normalisedOtp.substring(0, 6)
 
-        if (acceptableTokens.any { candidate -> candidateOtp == candidate }) {
+        if (acceptableTokens.any { candidate -> MessageDigest.isEqual(candidateOtp.toByteArray(), candidate.toByteArray()) }) {
             return OneTimePasswordValidationResult.OK
         }
 

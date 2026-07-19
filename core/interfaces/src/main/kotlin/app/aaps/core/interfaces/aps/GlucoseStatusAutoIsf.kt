@@ -10,6 +10,7 @@ data class GlucoseStatusAutoIsf(
     override val shortAvgDelta: Double = 0.0,
     override val longAvgDelta: Double = 0.0,
     override val date: Long = 0L,
+    override val bgAcceleration: Double = 0.0,
     /** past duration of BG changing only within +/- 5% */
     val duraISFminutes: Double = 0.0,
     /** average BG while BG was changing less than +/- 5% */
@@ -20,8 +21,6 @@ data class GlucoseStatusAutoIsf(
     val deltaPl: Double = 0.0,
     /** parabola derived next delta, i.e. from now to 5m into the future */
     val deltaPn: Double = 0.0,
-    /** parabola derived current BG acceleration */
-    val bgAcceleration: Double = 0.0,
     /** coefficient a0 in approximation parabola formula
      *  BG = a0 + a1 * Time + a2 * Time^2
      *  where 1 unit of Time is 5 minutes */

@@ -4,6 +4,7 @@ package app.aaps.core.interfaces.configuration
 interface Config {
 
     val SUPPORTED_NS_VERSION: Int
+    val ADVANCED: Boolean
     val APS: Boolean
     val AAPSCLIENT: Boolean // aapsclient || aapsclient2
     val AAPSCLIENT1: Boolean // aapsclient
@@ -12,6 +13,8 @@ interface Config {
     val PUMPDRIVERS: Boolean
     val FLAVOR: String
     val VERSION_NAME: String
+    val CUSTOM_PATCH_VERSION: String
+    val DISPLAY_VERSION_NAME: String
     val HEAD: String
     val COMMITTED: Boolean
     val BUILD_VERSION: String

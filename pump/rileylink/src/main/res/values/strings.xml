@@ -85,6 +85,8 @@
     <!-- RileyLink - Preferences -->
     <string name="riley_link_show_battery_level">Show battery level reported by OrangeLink/EmaLink/DiaLink</string>
     <string name="riley_link_show_battery_level_summary">DOES NOT work with the original RileyLink. May not work with other RileyLink alternatives.</string>
+    <string name="riley_link_fast_mode">[EXPERIMENTAL] Fast mode</string>
+    <string name="riley_link_fast_mode_summary">Lower down delays and etc. Highly experimental.</string>
 
     <plurals name="duration_days">
         <item quantity="one">%1$d day</item>

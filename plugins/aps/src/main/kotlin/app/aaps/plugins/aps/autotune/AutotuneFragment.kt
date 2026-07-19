@@ -316,6 +316,11 @@ class AutotuneFragment : DaggerFragment() {
         updateGui()
     }
 
+    override fun onPause() {
+        super.onPause()
+        disposable.clear()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
@@ -324,6 +329,9 @@ class AutotuneFragment : DaggerFragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // WeekdayPicker is created with the Activity context but stored in the singleton
+        // AutotunePlugin.days, so clear it here to avoid leaking the destroyed Activity.
+        days.view = null
         _binding = null
     }
 

@@ -139,7 +139,10 @@ class NSClientFragment : DaggerFragment(), MenuProvider, PluginFragment {
             }
 
             ID_MENU_SEND_NOW  -> {
-                handler.post { nsClientPlugin?.resend("GUI") }
+                // Capture the plugin (singleton) rather than `this` fragment: otherwise the
+                // background HandlerThread keeps the destroyed fragment alive while resend() runs.
+                val plugin = nsClientPlugin
+                handler.post { plugin?.resend("GUI") }
                 true
             }
 
@@ -163,17 +166,19 @@ class NSClientFragment : DaggerFragment(), MenuProvider, PluginFragment {
                                                     HtmlHelper.fromHtml("<b>" + rh.gs(app.aaps.core.ui.R.string.cleared_entries) + "</b><br>" + result).toSpanned()
                                                 )
                                             aapsLogger.info(LTag.CORE, "Cleaned up databases with result: $result")
+                                            val plugin = nsClientPlugin
                                             handler.post {
-                                                nsClientPlugin?.resetToFullSync()
-                                                nsClientPlugin?.resend("FULL_SYNC")
+                                                plugin?.resetToFullSync()
+                                                plugin?.resend("FULL_SYNC")
                                             }
                                         }
                                     )
                                 uel.log(action = Action.CLEANUP_DATABASES, source = Sources.NSClient)
                             }, {
+                                val plugin = nsClientPlugin
                                 handler.post {
-                                    nsClientPlugin?.resetToFullSync()
-                                    nsClientPlugin?.resend("FULL_SYNC")
+                                    plugin?.resetToFullSync()
+                                    plugin?.resend("FULL_SYNC")
                                 }
                             })
                         }

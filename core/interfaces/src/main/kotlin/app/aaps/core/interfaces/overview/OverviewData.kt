@@ -4,8 +4,17 @@ import android.content.Context
 import androidx.annotation.AttrRes
 import androidx.annotation.DrawableRes
 import app.aaps.core.data.model.GV
+import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.graph.Scale
 import app.aaps.core.interfaces.graph.SeriesData
+import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
+import app.aaps.core.interfaces.profile.Profile
+import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.profile.ProfileUtil
 
 interface OverviewData {
 
@@ -44,6 +53,12 @@ interface OverviewData {
     fun extendedBolusDialogText(): String
 
     /*
+     * APS
+     */
+    fun sensitivityText(showIsfForCarbs: Boolean, loop: Loop, iobCobCalculator: IobCobCalculator): String
+    fun autoOrTddSensRatio(loop: Loop, iobCobCalculator: IobCobCalculator): Double?
+
+    /*
      * Graphs
      */
 
@@ -74,6 +89,8 @@ interface OverviewData {
     var treatmentsSeries: SeriesData
     var maxTherapyEventValue: Double
     var therapyEventSeries: SeriesData
+    var maxProfileChangeValue: Double
+    var profileChangeEventSeries: SeriesData
 
     var maxIobValueFound: Double
     val iobScale: Scale
@@ -104,6 +121,32 @@ interface OverviewData {
     var minVarSensValueFound: Double
     val varSensScale: Scale
     var varSensSeries: SeriesData
+
+    // AutoISF intermediate factor graphs
+    var maxAcceIsfValueFound: Double
+    var minAcceIsfValueFound: Double
+    val acceIsfScale: Scale
+    var acceIsfSeries: SeriesData
+    var maxBgIsfValueFound: Double
+    var minBgIsfValueFound: Double
+    val bgIsfScale: Scale
+    var bgIsfSeries: SeriesData
+    var maxPpIsfValueFound: Double
+    var minPpIsfValueFound: Double
+    val ppIsfScale: Scale
+    var ppIsfSeries: SeriesData
+    var maxDuraIsfValueFound: Double
+    var minDuraIsfValueFound: Double
+    val duraIsfScale: Scale
+    var duraIsfSeries: SeriesData
+    var maxFinalIsfValueFound: Double
+    var minFinalIsfValueFound: Double
+    val finalIsfScale: Scale
+    var finalIsfSeries: SeriesData
+    var maxIobThValueFound: Double
+    var minIobThValueFound: Double
+    val iobThScale: Scale
+    var iobThSeries: SeriesData
 
     var maxFromMaxValueFound: Double
     var maxFromMinValueFound: Double

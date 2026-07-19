@@ -69,6 +69,8 @@ class RileyLinkBLE @Inject constructor(
     private var radioResponseCountNotified: Runnable? = null
     var isConnected = false
         private set
+    val isFastMode: Boolean
+        get() = preferences.get(RileylinkBooleanPreferenceKey.FastMode)
 
     @Inject fun onInit() {
         //aapsLogger.debug(LTag.PUMPBTCOMM, "BT Adapter: " + this.bluetoothAdapter);

@@ -25,11 +25,15 @@
     <string name="pumpisnottempbasalcapable">Помпа не рассчитана на подачу временного базала</string>
     <string name="closed_loop_disabled_on_dev_branch">Работает версия разработчика. Замкнутый цикл отключен.</string>
     <string name="closed_loop_disabled_with_eb">Замкнутый цикл отключен из-за работы Пролонгированного Болюса</string>
-    <string name="smbalwaysdisabled">Опция супер микро болюс всегда и после углеводов отключена т. к. активный источник ГК не поддерживает комплексное фильтрование</string>
-    <string name="smbnotallowedinopenloopmode">Микроболюсы SMB не работают в режиме открытого цикла</string>
+    <string name="smbalwaysdisabled">Опция SMB всегда и после углеводов отключена т. к. активный источник ГК не поддерживает комплексное фильтрование</string>
+    <string name="smbnotallowedinopenloopmode">SMB не работают в режиме открытого цикла</string>
     <string name="maxvalueinpreferences">максимальное значение в настройках</string>
     <string name="hardlimit">жесткий предел</string>
     <string name="treatmentssafety_title">Безопасность терапии</string>
+    <string name="always_promote_advanced_filtering_title">Всегда сообщать о продвинутой фильтрации</string>
+    <string name="always_promote_advanced_filtering_summary">[ОПАСНО] Отключить белый список НМГ, позволет SMB быть включенными всегда на всех НМГ</string>
+    <string name="allow_recalculated_bgs_title">Разрешить пересчитанный ГК</string>
+    <string name="allow_recalculated_bgs_summary">[ОПАСНО] Разрешить расчет дельт и ускорения на пересчитанных значениях ГК</string>
     <!-- Objectives -->
     <string name="completed_well_done">Завершено, отлично!</string>
     <string name="not_completed_yet">Не завершено</string>
@@ -46,4 +50,15 @@
     <string name="objectives_previous_button">Назад</string>
     <string name="objectives_button_unfinish">Сбросить пройденные</string>
     <string name="objectives_button_unstart">Сбросить начатые</string>
+    <!-- Night mode -->
+    <string name="night_mode">Ночной режим</string>
+    <string name="night_mode_begin">Начало ночного режима</string>
+    <string name="night_mode_end">Окончание ночного режима</string>
+    <string name="night_mode_bg_offset">Порог целевого ГК в ночном режиме</string>
+    <string name="night_mode_bg_offset_summary">Если ГК в данный момент ниже, чем целевой ГК плюс порог целевого ГК ночного режима, то SMB не будут подаваться.</string>
+    <string name="night_mode_cob">Выключать ночной режим при COB</string>
+    <string name="night_mode_lowtt">Выключать ночной режим при низкой ТТ</string>
+    <string name="night_mode_smbs_disabled">SMB выключены из-за активного ночного режима</string>
+    <string name="night_mode_disabled">Ночной режим отключен: %1$s</string>
+    <string name="bg_threshold_smbs_disabled">SMB отключены т.к. ГК ниже порогового значения: %1$d &lt; %2$d</string>
 </resources>

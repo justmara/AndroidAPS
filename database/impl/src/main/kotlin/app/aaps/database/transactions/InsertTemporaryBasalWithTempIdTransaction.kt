@@ -16,8 +16,9 @@ class InsertTemporaryBasalWithTempIdTransaction(
         val result = TransactionResult()
         val current = database.temporaryBasalDao.findByPumpTempIds(temporaryBasal.interfaceIDs.temporaryId!!, temporaryBasal.interfaceIDs.pumpType!!, temporaryBasal.interfaceIDs.pumpSerial!!)
         if (current == null) {
-            temporaryBasal.id = database.temporaryBasalDao.insert(temporaryBasal)
+            temporaryBasal.id = database.temporaryBasalDao.insertNewEntry(temporaryBasal)
             result.inserted.add(temporaryBasal)
+            if (database.changes.isEmpty()) database.changes.add(temporaryBasal)
         }
         return result
     }

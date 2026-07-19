@@ -609,7 +609,8 @@ open class ENPlugin @Inject constructor(
             out_units = if (profileFunction.getUnits() == GlucoseUnit.MMOL) "mmol/L" else "mg/dl",
             variable_sens = if (dynIsfMode) dynIsfResult.variableSensitivity ?: 0.0 else 0.0,
             insulinDivisor = dynIsfResult.insulinDivisor,
-            TDD = dynIsfResult.tdd ?: 0.0
+            TDD = dynIsfResult.tdd ?: 0.0,
+            use_TDD_for_predictions = null // not used
         )
 
         // Define the variables to be available to DetermineBasalEN.kt

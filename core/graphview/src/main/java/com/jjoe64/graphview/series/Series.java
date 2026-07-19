@@ -119,6 +119,13 @@ public interface Series<E extends DataPointInterface> {
     void onGraphViewAttached(GraphView graphView);
 
     /**
+     * called when the series is removed from a graph view
+     *
+     * @param graphView graphview
+     */
+    void onGraphViewDetached(GraphView graphView);
+
+    /**
      * @return whether there are data points
      */
     boolean isEmpty();

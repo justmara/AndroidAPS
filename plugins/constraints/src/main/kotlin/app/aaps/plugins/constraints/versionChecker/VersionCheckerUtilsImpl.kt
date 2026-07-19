@@ -11,6 +11,7 @@ import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.versionChecker.VersionCheckerUtils
 import app.aaps.core.interfaces.versionChecker.VersionDefinition
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.LongComposedKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.plugins.constraints.R
@@ -34,6 +35,12 @@ class VersionCheckerUtilsImpl @Inject constructor(
     var definition: JSONObject = versionDefinition.invoke()
 
     override fun triggerCheckVersion() {
+        // Do not check new updates at all if user wishes so
+        if (preferences.get(BooleanKey.DisableUpdatesChecker)) {
+            preferences.put(LongComposedKey.AppExpiration, config.get().VERSION_NAME, value = 0L)
+            return
+        }
+
         val version: String? = AllowedVersions.findByApi(definition, Build.VERSION.SDK_INT)
         val newVersionByApi = compareWithCurrentVersion(newVersion = version, currentVersion = config.get().VERSION_NAME)
 

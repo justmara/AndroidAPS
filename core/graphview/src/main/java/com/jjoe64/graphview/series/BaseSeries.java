@@ -370,6 +370,18 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     }
 
     /**
+     * called when the series is removed from a graph view.
+     * Removes the back-reference to prevent memory leaks when
+     * the GraphView (and its hosting Activity) is destroyed.
+     *
+     * @param graphView graphview
+     */
+    @Override
+    public void onGraphViewDetached(GraphView graphView) {
+        mGraphViews.remove(graphView);
+    }
+
+    /**
      * @param dataPoint     values the values must be in the correct order!
      *                      x-value has to be ASC. First the lowest x value and at least the highest x value.
      * @param scrollToEnd   true => graphview will scroll to the end (maxX)

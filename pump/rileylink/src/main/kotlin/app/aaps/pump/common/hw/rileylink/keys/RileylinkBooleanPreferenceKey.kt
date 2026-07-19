@@ -19,4 +19,5 @@ enum class RileylinkBooleanPreferenceKey(
 
     OrangeUseScanning("pref_orange_use_scanning", false),
     ShowReportedBatteryLevel("pref_riley_link_show_reported_battery_level", false),
+    FastMode("pref_rl_fast_mode", false, defaultedBySM = true),
 }

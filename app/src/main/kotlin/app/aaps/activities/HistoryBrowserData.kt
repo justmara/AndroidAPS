@@ -1,10 +1,15 @@
 package app.aaps.activities
 
+import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.db.ProcessedTbrEbData
 import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.AapsSchedulers
 import app.aaps.core.interfaces.rx.bus.RxBus
@@ -32,12 +37,18 @@ class HistoryBrowserData @Inject constructor(
     fabricPrivacy: FabricPrivacy,
     calculationWorkflow: CalculationWorkflow,
     decimalFormatter: DecimalFormatter,
-    processedTbrEbData: ProcessedTbrEbData
+    processedTbrEbData: ProcessedTbrEbData,
+    profileUtil: ProfileUtil,
+    processedDeviceStatusData: ProcessedDeviceStatusData,
+    config: Config,
+    constraintsChecker: ConstraintsChecker
 ) {
 
     // We don't want to use injected singletons but own instance working on top of different data
     val overviewData =
-        OverviewDataImpl(rh, dateUtil, preferences, activePlugin, profileFunction, persistenceLayer, processedTbrEbData)
+        OverviewDataImpl(
+            rh, dateUtil, activePlugin, profileFunction, persistenceLayer, processedTbrEbData, preferences,
+            profileUtil, processedDeviceStatusData, config, aapsLogger, constraintsChecker)
     val iobCobCalculator =
         IobCobCalculatorPlugin(
             aapsLogger, aapsSchedulers, rxBus, preferences, rh, profileFunction, activePlugin,

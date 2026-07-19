@@ -28,14 +28,18 @@ import app.aaps.core.interfaces.protection.PasswordCheck
 import app.aaps.core.interfaces.protection.ProtectionCheck.ProtectionType.BIOMETRIC
 import app.aaps.core.interfaces.protection.ProtectionCheck.ProtectionType.CUSTOM_PASSWORD
 import app.aaps.core.interfaces.protection.ProtectionCheck.ProtectionType.CUSTOM_PIN
+import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventPreferenceChange
 import app.aaps.core.interfaces.rx.events.EventRebuildTabs
+import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.StringKey
+import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.keys.interfaces.DoublePreferenceKey
 import app.aaps.core.keys.interfaces.IntPreferenceKey
 import app.aaps.core.keys.interfaces.PreferenceKey
@@ -69,6 +73,8 @@ class MyPreferenceFragment : PreferenceFragmentCompat(), OnSharedPreferenceChang
     @Inject lateinit var rxBus: RxBus
     @Inject lateinit var rh: ResourceHelper
     @Inject lateinit var preferences: Preferences
+    @Inject lateinit var sp: SP
+    @Inject lateinit var profileUtil: ProfileUtil
     @Inject lateinit var activePlugin: ActivePlugin
     @Inject lateinit var config: Config
     @Inject lateinit var passwordCheck: PasswordCheck
@@ -168,6 +174,7 @@ class MyPreferenceFragment : PreferenceFragmentCompat(), OnSharedPreferenceChang
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         key ?: return
         rxBus.send(EventPreferenceChange(key))
+        syncNightMode(key)
         if (key == StringKey.GeneralLanguage.key) {
             rxBus.send(EventRebuildTabs(true))
             //recreate() does not update language so better close settings
@@ -193,6 +200,63 @@ class MyPreferenceFragment : PreferenceFragmentCompat(), OnSharedPreferenceChang
         preprocessCustomVisibility(preferenceScreen)
         updatePrefSummary(findPreference(key))
         preprocessPreferences()
+    }
+
+    /**
+     * Night mode is configured in two independent places: APS Boost settings and
+     * Therapy safety → Night mode. Both implement the very same logic, so the
+     * matching options are kept in sync here: whenever one option changes, the
+     * corresponding option in the other place is updated to the same value.
+     *
+     * The [syncingNightMode] guard stops the mirrored write from re-triggering this
+     * callback and causing an endless ping-pong between the two keys.
+     */
+    private var syncingNightMode = false
+
+    private fun syncNightMode(changedKey: String) {
+        if (syncingNightMode) return
+        syncingNightMode = true
+        try {
+            // Boolean options with identical meaning: enable, disable-with-COB, disable-with-low-TT
+            val booleanPairs = listOf(
+                BooleanKey.NightMode.key to BooleanKey.ApsBoostNightModeEnabled.key,
+                BooleanKey.NightModeWithCOB.key to BooleanKey.ApsBoostNightModeDisableWithCob.key,
+                BooleanKey.NightModeLowTT.key to BooleanKey.ApsBoostNightModeDisableWithLowTt.key,
+            )
+            booleanPairs.forEach { (safetyKey, boostKey) ->
+                when (changedKey) {
+                    safetyKey -> sp.putBoolean(boostKey, sp.getBoolean(safetyKey, false))
+                    boostKey  -> sp.putBoolean(safetyKey, sp.getBoolean(boostKey, false))
+                }
+            }
+            // Begin / end time strings
+            val stringPairs = listOf(
+                StringKey.NightModeBegin.key to StringKey.ApsBoostNightModeStart.key,
+                StringKey.NightModeEnd.key to StringKey.ApsBoostNightModeEnd.key,
+            )
+            stringPairs.forEach { (safetyKey, boostKey) ->
+                when (changedKey) {
+                    safetyKey -> sp.putString(boostKey, sp.getString(safetyKey, ""))
+                    boostKey  -> sp.putString(safetyKey, sp.getString(boostKey, ""))
+                }
+            }
+            // BG offset: Safety stores the value in display units, Boost stores it in mg/dl
+            val safetyOffset = DoubleKey.NightModeBgOffset
+            val boostOffset = UnitDoubleKey.ApsBoostNightModeBgOffset
+            when (changedKey) {
+                safetyOffset.key -> {
+                    val display = sp.getDouble(safetyOffset.key, safetyOffset.defaultValue)
+                    sp.putDouble(boostOffset.key, profileUtil.convertToMgdl(display, profileUtil.units))
+                }
+
+                boostOffset.key  -> {
+                    val mgdl = sp.getDouble(boostOffset.key, boostOffset.defaultValue)
+                    sp.putDouble(safetyOffset.key, profileUtil.fromMgdlToUnits(mgdl, profileUtil.units))
+                }
+            }
+        } finally {
+            syncingNightMode = false
+        }
     }
 
     // Update preferences with calculated visibility
@@ -418,6 +482,8 @@ class MyPreferenceFragment : PreferenceFragmentCompat(), OnSharedPreferenceChang
                     summary = app.aaps.plugins.main.R.string.theme_switcher_summary
                 )
             )
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DisableUpdatesChecker, title = R.string.disable_updates_checker))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.EngineeringMode, title = R.string.enable_engineering_mode))
         }
     }
 

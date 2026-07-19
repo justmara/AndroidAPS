@@ -52,7 +52,7 @@ class SetTempBasalPacket(injector: HasAndroidInjector, private val absoluteRate:
     override fun handleResponse(data: ByteArray): Boolean {
         val success = super.handleResponse(data)
         if (success) {
-            val basalType = enumValues<BasalType>()[data.copyOfRange(RESP_BASAL_TYPE_START, RESP_BASAL_TYPE_END).toInt()]
+            val basalType = enumValues<BasalType>().getOrNull(data.copyOfRange(RESP_BASAL_TYPE_START, RESP_BASAL_TYPE_END).toInt()) ?: BasalType.NONE
             val basalRate = data.copyOfRange(RESP_BASAL_RATE_START, RESP_BASAL_RATE_END).toInt() * 0.05
             val basalSequence = data.copyOfRange(RESP_BASAL_SEQUENCE_START, RESP_BASAL_SEQUENCE_END).toInt()
             val basalPatchId = data.copyOfRange(RESP_BASAL_PATCH_ID_START, RESP_BASAL_PATCH_ID_END).toLong()

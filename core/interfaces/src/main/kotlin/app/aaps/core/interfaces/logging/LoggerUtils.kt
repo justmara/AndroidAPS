@@ -1,7 +1,11 @@
 package app.aaps.core.interfaces.logging
 
+import android.content.Context
+
 interface LoggerUtils {
 
-    var suffix: String
+    fun initialize(appContext: Context)
+
     val logDirectory: String
+    val suffix: String
 }

@@ -15,16 +15,35 @@ class LImpl @Inject constructor(
 ) : L {
 
     private var _logElements: List<LogElement>? = null
+    // Map for O(1) lookups. findByName() is called on every single log statement in the app
+    // (even for disabled tags), so a linear scan here is pure wasted CPU/battery 24/7.
+    private var _logElementMap: Map<String, LogElement>? = null
+    // Shared fallback for unknown tag names. Always disabled, never mutated, so it is safe to
+    // reuse instead of allocating a throwaway LogElementImpl on every lookup miss.
+    private val notFoundElement: LogElement by lazy { LogElementImpl(false, preferences.get()) }
 
     override fun logElements(): List<LogElement> {
         if (_logElements == null) {
-            _logElements = LTag.entries.map { LogElementImpl(it, preferences.get()) }
+            val elements = LTag.entries.map { LogElementImpl(it, preferences.get()) }
+            // Built from the same instances as the list, so enable()/resetToDefault() mutations
+            // stay visible through both views. Publish the map before the list so any thread that
+            // observes _logElements as built also sees the map built.
+            _logElementMap = elements.associateBy { it.name }
+            _logElements = elements
         }
         return _logElements!!
     }
 
-    override fun findByName(name: String): LogElement =
-        logElements().find { it.name == name } ?: LogElementImpl(false, preferences.get())
+    override fun findByName(name: String): LogElement {
+        var map = _logElementMap
+        if (map == null) {
+            logElements()
+            map = _logElementMap
+        }
+        // Fall back to the disabled element if the map is still unbuilt (concurrent first-call
+        // race). Never dereference with !!, so logging can never crash the app.
+        return map?.get(name) ?: notFoundElement
+    }
 
     override fun resetToDefaults() {
         logElements().forEach { it.resetToDefault() }

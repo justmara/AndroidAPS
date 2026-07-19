@@ -321,10 +321,28 @@ class PrepareIobAutosensGraphDataWorker(
             it.thickness = 3
         }
 
-        // VAR_SENS
+        // VAR_SENS + AutoISF intermediate factors (all sourced from persisted APS results)
         val varSensArray: MutableList<ScaledDataPoint> = ArrayList()
         data.overviewData.maxVarSensValueFound = Double.MIN_VALUE
         data.overviewData.minVarSensValueFound = Double.MAX_VALUE
+        val acceIsfArray: MutableList<ScaledDataPoint> = ArrayList()
+        val bgIsfArray: MutableList<ScaledDataPoint> = ArrayList()
+        val ppIsfArray: MutableList<ScaledDataPoint> = ArrayList()
+        val duraIsfArray: MutableList<ScaledDataPoint> = ArrayList()
+        val finalIsfArray: MutableList<ScaledDataPoint> = ArrayList()
+        val iobThArray: MutableList<ScaledDataPoint> = ArrayList()
+        data.overviewData.maxAcceIsfValueFound = Double.MIN_VALUE
+        data.overviewData.minAcceIsfValueFound = Double.MAX_VALUE
+        data.overviewData.maxBgIsfValueFound = Double.MIN_VALUE
+        data.overviewData.minBgIsfValueFound = Double.MAX_VALUE
+        data.overviewData.maxPpIsfValueFound = Double.MIN_VALUE
+        data.overviewData.minPpIsfValueFound = Double.MAX_VALUE
+        data.overviewData.maxDuraIsfValueFound = Double.MIN_VALUE
+        data.overviewData.minDuraIsfValueFound = Double.MAX_VALUE
+        data.overviewData.maxFinalIsfValueFound = Double.MIN_VALUE
+        data.overviewData.minFinalIsfValueFound = Double.MAX_VALUE
+        data.overviewData.maxIobThValueFound = Double.MIN_VALUE
+        data.overviewData.minIobThValueFound = Double.MAX_VALUE
         val apsResults = persistenceLayer.getApsResults(fromTime, endTime)
         apsResults.forEach {
             it.variableSens?.let { variableSens ->
@@ -333,10 +351,53 @@ class PrepareIobAutosensGraphDataWorker(
                 data.overviewData.maxVarSensValueFound = max(data.overviewData.maxVarSensValueFound, varSens)
                 data.overviewData.minVarSensValueFound = min(data.overviewData.minVarSensValueFound, varSens)
             }
+            it.acceIsf?.let { v ->
+                acceIsfArray.add(ScaledDataPoint(it.date, v, data.overviewData.acceIsfScale))
+                data.overviewData.maxAcceIsfValueFound = max(data.overviewData.maxAcceIsfValueFound, v)
+                data.overviewData.minAcceIsfValueFound = min(data.overviewData.minAcceIsfValueFound, v)
+            }
+            it.bgIsf?.let { v ->
+                bgIsfArray.add(ScaledDataPoint(it.date, v, data.overviewData.bgIsfScale))
+                data.overviewData.maxBgIsfValueFound = max(data.overviewData.maxBgIsfValueFound, v)
+                data.overviewData.minBgIsfValueFound = min(data.overviewData.minBgIsfValueFound, v)
+            }
+            it.ppIsf?.let { v ->
+                ppIsfArray.add(ScaledDataPoint(it.date, v, data.overviewData.ppIsfScale))
+                data.overviewData.maxPpIsfValueFound = max(data.overviewData.maxPpIsfValueFound, v)
+                data.overviewData.minPpIsfValueFound = min(data.overviewData.minPpIsfValueFound, v)
+            }
+            it.duraIsf?.let { v ->
+                duraIsfArray.add(ScaledDataPoint(it.date, v, data.overviewData.duraIsfScale))
+                data.overviewData.maxDuraIsfValueFound = max(data.overviewData.maxDuraIsfValueFound, v)
+                data.overviewData.minDuraIsfValueFound = min(data.overviewData.minDuraIsfValueFound, v)
+            }
+            it.finalIsf?.let { v ->
+                finalIsfArray.add(ScaledDataPoint(it.date, v, data.overviewData.finalIsfScale))
+                data.overviewData.maxFinalIsfValueFound = max(data.overviewData.maxFinalIsfValueFound, v)
+                data.overviewData.minFinalIsfValueFound = min(data.overviewData.minFinalIsfValueFound, v)
+            }
+            it.iobThreshold?.let { v ->
+                iobThArray.add(ScaledDataPoint(it.date, v, data.overviewData.iobThScale))
+                data.overviewData.maxIobThValueFound = max(data.overviewData.maxIobThValueFound, v)
+                data.overviewData.minIobThValueFound = min(data.overviewData.minIobThValueFound, v)
+            }
         }
         data.overviewData.varSensSeries = LineGraphSeries(Array(varSensArray.size) { i -> varSensArray[i] }).also {
             it.color = rh.gac(ctx, app.aaps.core.ui.R.attr.ratioColor)
             it.thickness = 3
+        }
+        data.overviewData.acceIsfSeries = LineGraphSeries(Array(acceIsfArray.size) { i -> acceIsfArray[i] }).also { it.color = rh.gac(ctx, app.aaps.core.ui.R.attr.acceIsfColor); it.thickness = 3 }
+        data.overviewData.bgIsfSeries = LineGraphSeries(Array(bgIsfArray.size) { i -> bgIsfArray[i] }).also { it.color = rh.gac(ctx, app.aaps.core.ui.R.attr.bgIsfColor); it.thickness = 3 }
+        data.overviewData.ppIsfSeries = LineGraphSeries(Array(ppIsfArray.size) { i -> ppIsfArray[i] }).also { it.color = rh.gac(ctx, app.aaps.core.ui.R.attr.ppIsfColor); it.thickness = 3 }
+        data.overviewData.duraIsfSeries = LineGraphSeries(Array(duraIsfArray.size) { i -> duraIsfArray[i] }).also { it.color = rh.gac(ctx, app.aaps.core.ui.R.attr.duraIsfColor); it.thickness = 3 }
+        data.overviewData.finalIsfSeries = LineGraphSeries(Array(finalIsfArray.size) { i -> finalIsfArray[i] }).also { it.color = rh.gac(ctx, app.aaps.core.ui.R.attr.finalIsfColor); it.thickness = 8 }
+        data.overviewData.iobThSeries = LineGraphSeries(Array(iobThArray.size) { i -> iobThArray[i] }).also {
+            it.setCustomPaint(Paint().also { paint ->
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 3f
+                paint.pathEffect = DashPathEffect(floatArrayOf(2f, 2f), 0f)
+                paint.color = rh.gac(ctx, app.aaps.core.ui.R.attr.iobThColor)
+            })
         }
 
         rxBus.send(EventIobCalculationProgress(CalculationWorkflow.ProgressData.PREPARE_IOB_AUTOSENS_DATA, 100, null))

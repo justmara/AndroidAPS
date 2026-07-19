@@ -19,6 +19,7 @@
     <string name="permission">Permission</string>
     <string name="need_system_window_permission">Application needs system window permission for notifications</string>
     <string name="need_location_permission">Application needs location permission for BT scan and WiFi identification</string>
+    <string name="need_activity_recognition_permission">Boost plugin needs activity recognition permission for step counter</string>
     <string name="need_background_location_permission">Application needs background location permission for automations</string>
     <string name="need_storage_permission">Application needs storage permission to be able store log files and export settings</string>
     <string name="askforpermission">Ask for permission</string>
@@ -61,6 +62,7 @@
     <string name="apsmode_title">APS Mode</string>
     <string name="error_asking_for_permissions">Error asking for permissions</string>
     <string name="alert_dialog_permission_battery_optimization_failed">This device does not appear to support battery optimization whitelisting - you may experience performance issues.</string>
+    <string name="need_ext_storage_permission">Application needs permission for accessing internal storage to store logs</string>
 
     <!--    ConfigBuilder-->
     <string name="config_builder">Config Builder</string>

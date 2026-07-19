@@ -2,6 +2,7 @@ package app.aaps.plugins.sync.di
 
 import android.content.Context
 import androidx.work.WorkManager
+import app.aaps.core.interfaces.metrics.MetricsSampler
 import app.aaps.core.interfaces.nsclient.NSSettingsStatus
 import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
 import app.aaps.core.interfaces.nsclient.StoreDataForDb
@@ -9,6 +10,8 @@ import app.aaps.core.interfaces.sync.DataSyncSelectorXdrip
 import app.aaps.core.interfaces.sync.XDripBroadcast
 import app.aaps.plugins.sync.garmin.LoopHub
 import app.aaps.plugins.sync.garmin.LoopHubImpl
+import app.aaps.plugins.sync.metrics.HealthConnectPermissionActivity
+import app.aaps.plugins.sync.metrics.MetricsSamplerImpl
 import app.aaps.plugins.sync.nsShared.NSClientFragment
 import app.aaps.plugins.sync.nsShared.StoreDataForDbImpl
 import app.aaps.plugins.sync.nsclient.data.NSSettingsStatusImpl
@@ -79,6 +82,7 @@ abstract class SyncModule {
     @ContributesAndroidInjector abstract fun contributesWearDataReceiver(): WearDataReceiver
     @ContributesAndroidInjector abstract fun contributesWatchUpdaterService(): DataLayerListenerServiceMobile
     @ContributesAndroidInjector abstract fun contributesCustomWatchfaceInfosActivity(): CwfInfosActivity
+    @ContributesAndroidInjector abstract fun contributesHealthConnectPermissionActivity(): HealthConnectPermissionActivity
 
     @Module
     open class Provide {
@@ -97,6 +101,7 @@ abstract class SyncModule {
         @Binds fun bindStoreDataForDb(storeDataForDbImpl: StoreDataForDbImpl): StoreDataForDb
         @Binds fun bindXDripBroadcastInterface(xDripBroadcastImpl: XdripPlugin): XDripBroadcast
         @Binds fun bindLoopHub(loopHub: LoopHubImpl): LoopHub
+        @Binds fun bindMetricsSampler(metricsSamplerImpl: MetricsSamplerImpl): MetricsSampler
     }
 
 }

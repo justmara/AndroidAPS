@@ -214,6 +214,7 @@ class WearPlugin @Inject constructor(
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.WearWizardTrend, title = app.aaps.core.ui.R.string.bg_trend_label))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.WearWizardCob, title = app.aaps.core.ui.R.string.treatments_wizard_cob_label))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.WearWizardIob, title = app.aaps.core.ui.R.string.iob_label))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.WearWizardAlarm, title = app.aaps.core.ui.R.string.alarm))
             })
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
                 key = "wear_custom_watchface_settings"

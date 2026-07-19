@@ -51,6 +51,7 @@ class FileListProviderImpl @Inject constructor(
     private val documentsPath get() = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "AAPS")
     override val resultPath get() = File(documentsPath, File.separator + "results")
 
+    val logsPath = "logs"
     val preferencesPath = "preferences"
     val exportsPath = "exports"
     val tempPath = "temp"
@@ -162,6 +163,16 @@ class FileListProviderImpl @Inject constructor(
         val baseDir = DocumentFile.fromTreeUri(context, uri)
         val files = baseDir?.listFiles()
         return files?.firstOrNull { it.name == extraPath } ?: baseDir?.createDirectory(extraPath)
+    }
+
+    override fun ensureLogsDirExists(): DocumentFile? {
+        val prefUri = preferences.get().getIfExists(StringKey.AapsDirectoryUri) ?: return null
+        val uri = Uri.parse(prefUri)
+        val baseDir = DocumentFile.fromTreeUri(context, uri)
+        val files = baseDir?.listFiles()
+        val logsDir = files?.firstOrNull { it.name == logsPath } ?: baseDir?.createDirectory(logsPath)
+        val logsDirFiles = logsDir?.listFiles()
+        return logsDirFiles?.firstOrNull { it.name == config.get().APPLICATION_ID } ?: logsDir?.createDirectory(config.get().APPLICATION_ID)
     }
 
     override fun ensureResultDirExists(): File {

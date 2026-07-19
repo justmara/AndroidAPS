@@ -8,4 +8,5 @@ interface GlucoseStatus {
     val shortAvgDelta: Double
     val longAvgDelta: Double
     val date: Long
+    val bgAcceleration: Double
 }

@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.aps.ENConfig
 import app.aaps.core.interfaces.aps.OapsProfile
 import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
+import app.aaps.core.interfaces.aps.OapsProfileBoost
 import app.aaps.core.interfaces.aps.Predictions
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.constraints.Constraint
@@ -67,7 +68,15 @@ class DetermineBasalResult @Inject constructor(
     override var carbsReqWithin = 0
     override var variableSens: Double? = null
     override var isfMgdlForCarbs: Double? = null // used only to pass to AAPS client
+    override var carbRatio: Double? = null       // effective CR used (Dynamic/Auto CR)
+    override var carbRatioReason: String? = null // Dynamic CR "Script debug" line
     override var scriptDebug: List<String>? = null
+    override var acceIsf: Double? = null
+    override var bgIsf: Double? = null
+    override var ppIsf: Double? = null
+    override var duraIsf: Double? = null
+    override var finalIsf: Double? = null
+    override var iobThreshold: Double? = null
     var eventualBG = 0.0
     var snoozeBG = 0.0
 
@@ -84,6 +93,7 @@ class DetermineBasalResult @Inject constructor(
     override var currentTemp: CurrentTemp? = null
     override var oapsProfile: OapsProfile? = null
     override var oapsProfileAutoIsf: OapsProfileAutoIsf? = null
+    override var oapsProfileBoost: OapsProfileBoost? = null
     override var mealData: MealData? = null
     override var enConfig: ENConfig? = null
 
@@ -110,7 +120,15 @@ class DetermineBasalResult @Inject constructor(
         deliverAt = result.deliverAt ?: 0L
         variableSens = result.variable_sens
         isfMgdlForCarbs = result.isfMgdlForCarbs
+        carbRatio = result.carbRatio
+        carbRatioReason = result.carbRatioReason
         scriptDebug = result.consoleError
+        acceIsf = result.acceIsf
+        bgIsf = result.bgIsf
+        ppIsf = result.ppIsf
+        duraIsf = result.duraIsf
+        finalIsf = result.finalIsf
+        iobThreshold = result.iobThreshold
     }
 
     override val carbsRequiredText: String

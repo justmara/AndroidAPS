@@ -18,6 +18,7 @@ import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.IntNonKey
 import app.aaps.core.keys.IntentKey
 import app.aaps.core.keys.LongComposedKey
+import app.aaps.core.keys.LongKey
 import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
@@ -76,6 +77,7 @@ class PreferencesImpl @Inject constructor(
             IntComposedKey::class.java,
             IntNonKey::class.java,
             LongComposedKey::class.java,
+            LongKey::class.java,
             LongNonKey::class.java,
             StringKey::class.java,
             StringNonKey::class.java,
@@ -99,7 +101,7 @@ class PreferencesImpl @Inject constructor(
     }
 
     override fun get(key: BooleanPreferenceKey): Boolean =
-        if (!config.isEngineeringMode() && key.engineeringModeOnly) key.defaultValue
+        if (key.engineeringModeOnly && !config.isEngineeringMode()) key.defaultValue
         else if (simpleMode && key.defaultedBySM) calculatedDefaultValue(key)
         else if (key.calculatedDefaultValue && isHidden(key)) calculatedDefaultValue(key)
         else sp.getBoolean(key.key, calculatedDefaultValue(key))

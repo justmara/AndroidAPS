@@ -343,7 +343,7 @@ class DiaconnG8Service : DaggerService() {
                 val endLogNo: Int = startLogNo + min(end - startLogNo, pumpLogPageSize)
                 aapsLogger.debug(LTag.PUMPCOMM, "pumplog request : $startLogNo ~ $endLogNo")
                 val msg = BigLogInquirePacket(injector, startLogNo, endLogNo, 100)
-                sendMessage(msg, 2000)
+                sendMessage(msg, 500)
             }
             result.success(true)
             diaconnG8Pump.lastConnection = System.currentTimeMillis()

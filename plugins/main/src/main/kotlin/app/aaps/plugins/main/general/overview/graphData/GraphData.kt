@@ -62,8 +62,11 @@ class GraphData @Inject constructor(
         minY = 0.0
         addSeries(overviewData.bgReadingGraphSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
         if (addPredictions) addSeries(overviewData.predictionsGraphSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
+        // Use the application context: the series live in the singleton OverviewDataImpl, so a
+        // listener capturing the Activity context would leak the (destroyed) Activity.
+        val appContext = context?.applicationContext
         (overviewData.bgReadingGraphSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>).setOnDataPointTapListener { _, dataPoint ->
-            if (dataPoint is GlucoseValueDataPoint) ToastUtils.infoToast(context, dataPoint.label)
+            if (dataPoint is GlucoseValueDataPoint) ToastUtils.infoToast(appContext, dataPoint.label)
         }
     }
 
@@ -109,15 +112,17 @@ class GraphData @Inject constructor(
     fun addTreatments(context: Context?) {
         maxY = maxOf(maxY, overviewData.maxTreatmentsValue)
         addSeries(overviewData.treatmentsSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
+        val appContext = context?.applicationContext
         (overviewData.treatmentsSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>).setOnDataPointTapListener { _, dataPoint ->
-            if (dataPoint is BolusDataPoint) ToastUtils.infoToast(context, dataPoint.label)
+            if (dataPoint is BolusDataPoint) ToastUtils.infoToast(appContext, dataPoint.label)
         }
     }
 
     fun addEps(context: Context?, scale: Double) {
         addSeries(overviewData.epsSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
+        val appContext = context?.applicationContext
         (overviewData.epsSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>).setOnDataPointTapListener { _, dataPoint ->
-            if (dataPoint is EffectiveProfileSwitchDataPoint) ToastUtils.infoToast(context, dataPoint.data.originalCustomizedName)
+            if (dataPoint is EffectiveProfileSwitchDataPoint) ToastUtils.infoToast(appContext, dataPoint.data.originalCustomizedName)
         }
         overviewData.epsScale.multiplier = maxY * scale / overviewData.maxEpsValue
     }
@@ -125,6 +130,11 @@ class GraphData @Inject constructor(
     fun addTherapyEvents() {
         maxY = maxOf(maxY, overviewData.maxTherapyEventValue)
         addSeries(overviewData.therapyEventSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
+    }
+
+    fun addProfileChangeEvents() {
+        maxY = maxOf(maxY, overviewData.maxProfileChangeValue)
+        addSeries(overviewData.profileChangeEventSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
     }
 
     fun addActivity(scale: Double) {
@@ -250,6 +260,90 @@ class GraphData @Inject constructor(
         addSeries(overviewData.varSensSeries as LineGraphSeries<ScaledDataPoint>)
     }
 
+    // AutoISF intermediate-factor graphs. When several are shown together (useCommonFactor),
+    // they share one axis centred on 1.0 (minY = 2.0 - maxY) so their relative values are comparable.
+    fun addAcceIsf(useForScale: Boolean, scale: Double, useCommonFactor: Boolean, maxCommonFactor: Double) {
+        if (useCommonFactor) {
+            maxY = maxCommonFactor
+            minY = 2.0 - maxY
+        } else if (useForScale) {
+            maxY = max(overviewData.maxAcceIsfValueFound, maxCommonFactor)
+            minY = 2.0 - maxY
+        }
+        if (maxY == 1.0) maxY += 1.0e-6
+        if (minY == 1.0) minY -= 1.0e-6
+        overviewData.acceIsfScale.multiplier = maxY * scale / max(overviewData.maxAcceIsfValueFound, maxCommonFactor)
+        addSeries(overviewData.acceIsfSeries as LineGraphSeries<ScaledDataPoint>)
+    }
+
+    fun addBgIsf(useForScale: Boolean, scale: Double, useCommonFactor: Boolean, maxCommonFactor: Double) {
+        if (useCommonFactor) {
+            maxY = maxCommonFactor
+            minY = 2.0 - maxY
+        } else if (useForScale) {
+            maxY = max(overviewData.maxBgIsfValueFound, maxCommonFactor)
+            minY = 2.0 - maxY
+        }
+        if (maxY == 1.0) maxY += 1.0e-6
+        if (minY == 1.0) minY -= 1.0e-6
+        overviewData.bgIsfScale.multiplier = maxY * scale / max(overviewData.maxBgIsfValueFound, maxCommonFactor)
+        addSeries(overviewData.bgIsfSeries as LineGraphSeries<ScaledDataPoint>)
+    }
+
+    fun addPpIsf(useForScale: Boolean, scale: Double, useCommonFactor: Boolean, maxCommonFactor: Double) {
+        if (useCommonFactor) {
+            maxY = maxCommonFactor
+            minY = 2.0 - maxY
+        } else if (useForScale) {
+            maxY = max(overviewData.maxPpIsfValueFound, maxCommonFactor)
+            minY = 2.0 - maxY
+        }
+        if (maxY == 1.0) maxY += 1.0e-6
+        if (minY == 1.0) minY -= 1.0e-6
+        overviewData.ppIsfScale.multiplier = maxY * scale / max(overviewData.maxPpIsfValueFound, maxCommonFactor)
+        addSeries(overviewData.ppIsfSeries as LineGraphSeries<ScaledDataPoint>)
+    }
+
+    fun addDuraIsf(useForScale: Boolean, scale: Double, useCommonFactor: Boolean, maxCommonFactor: Double) {
+        if (useCommonFactor) {
+            maxY = maxCommonFactor
+            minY = 2.0 - maxY
+        } else if (useForScale) {
+            maxY = max(overviewData.maxDuraIsfValueFound, maxCommonFactor)
+            minY = 2.0 - maxY
+        }
+        if (maxY == 1.0) maxY += 1.0e-6
+        if (minY == 1.0) minY -= 1.0e-6
+        overviewData.duraIsfScale.multiplier = maxY * scale / max(overviewData.maxDuraIsfValueFound, maxCommonFactor)
+        addSeries(overviewData.duraIsfSeries as LineGraphSeries<ScaledDataPoint>)
+    }
+
+    fun addFinalIsf(useForScale: Boolean, scale: Double, useCommonFactor: Boolean, maxCommonFactor: Double) {
+        if (useCommonFactor) {
+            maxY = maxCommonFactor
+            minY = 2.0 - maxY
+        } else if (useForScale) {
+            maxY = max(overviewData.maxFinalIsfValueFound, maxCommonFactor)
+            minY = 2.0 - maxY
+        }
+        if (maxY == 1.0) maxY += 1.0e-6
+        if (minY == 1.0) minY -= 1.0e-6
+        overviewData.finalIsfScale.multiplier = maxY * scale / max(overviewData.maxFinalIsfValueFound, maxCommonFactor)
+        addSeries(overviewData.finalIsfSeries as LineGraphSeries<ScaledDataPoint>)
+    }
+
+    fun addIobTh(useForScale: Boolean, scale: Double, maxCommonIob: Double) {
+        if (maxCommonIob > 0.0) {
+            maxY = maxCommonIob
+            minY = -maxY
+        } else if (useForScale) {
+            maxY = max(overviewData.maxIobThValueFound, maxCommonIob)
+            minY = -maxY
+        }
+        overviewData.iobThScale.multiplier = maxY * scale / max(overviewData.maxIobThValueFound, maxCommonIob)
+        addSeries(overviewData.iobThSeries as LineGraphSeries<ScaledDataPoint>)
+    }
+
     fun setNumVerticalLabels() {
         graph.gridLabelRenderer.numVerticalLabels = max(3, if (units == GlucoseUnit.MGDL) (maxY / 40 + 1).toInt() else (maxY / 2 + 1).toInt())
     }
@@ -297,12 +391,25 @@ class GraphData @Inject constructor(
     }
 
     fun addSteps(useForScale: Boolean, scale: Double) {
+        // The Scale object is shared and persists across renders, so reset it to identity
+        // before reading the highest value - otherwise highestValueY returns the value
+        // already scaled by the previous render and the axis/scale would drift.
+        overviewData.stepsForScale.shift = 0.0
+        overviewData.stepsForScale.multiplier = 1.0
         val maxSteps = (overviewData.stepsCountGraphSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>).highestValueY
         if (useForScale) {
             minY = 0.0
-            maxY = maxSteps
+            // Guard against an empty/all-zero series: maxY == minY == 0 yields a degenerate
+            // [0,0] viewport and a broken (divide-by-zero) vertical axis.
+            maxY = if (maxSteps > 0) maxSteps else 100.0
         }
         addSeries(overviewData.stepsCountGraphSeries as PointsWithLabelGraphSeries<DataPointWithLabelInterface>)
-        overviewData.stepsForScale.multiplier = maxY * scale / maxSteps
+        if (maxSteps > 0) {
+            // Steps start at 0, so shifting by minY maps a count of 0 to the bottom of the
+            // (possibly shared) viewport and maxSteps to minY + (maxY - minY) * scale -
+            // keeping bars visible even when another series (e.g. heart rate) drives the scale.
+            overviewData.stepsForScale.shift = minY
+            overviewData.stepsForScale.multiplier = (maxY - minY) * scale / maxSteps
+        }
     }
 }

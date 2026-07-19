@@ -1,0 +1,553 @@
+package app.aaps.plugins.aps.openAPSBoostV5
+
+import android.content.Context
+import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceManager
+import androidx.preference.PreferenceScreen
+import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.interfaces.aps.IobTotal
+import app.aaps.core.interfaces.aps.APS
+import app.aaps.core.interfaces.aps.APSResult
+import app.aaps.core.interfaces.aps.GlucoseStatus
+import app.aaps.core.interfaces.profile.Profile
+import app.aaps.core.interfaces.aps.OapsProfileBoost
+import app.aaps.core.interfaces.aps.RT
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.constraints.Constraint
+import app.aaps.core.interfaces.constraints.PluginConstraints
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.core.interfaces.plugin.PluginDescription
+import app.aaps.core.interfaces.resources.ResourceHelper
+import app.aaps.core.data.model.BS
+import app.aaps.core.interfaces.constraints.ConstraintsChecker
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.stats.TddCalculator
+import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.UnitDoubleKey
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.validators.preferences.AdaptiveDoublePreference
+import app.aaps.core.validators.preferences.AdaptiveSwitchPreference
+import app.aaps.core.validators.preferences.AdaptiveUnitPreference
+import app.aaps.plugins.aps.OpenAPSFragment
+import app.aaps.plugins.aps.R
+import org.json.JSONObject
+import java.time.LocalTime
+import java.time.ZoneId
+import javax.inject.Inject
+import javax.inject.Provider
+import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSBoost.BoostRiskModel
+import app.aaps.plugins.aps.openAPSBoost.OpenAPSBoostPlugin
+import kotlin.math.abs
+import kotlin.math.max
+
+/**
+ * Boost V5 — Observe-Confirm-Commit dosing pipeline.
+ *
+ * Status: PRODUCTION — this is the user-facing "Boost V6" APS plugin, selectable for active dosing
+ * (`showInList { config.APS }`). Validated through the test plan's acceptance gates and live use.
+ * (Earlier header said PRE-ALPHA/shadow-only/hidden — that was superseded when V5/V6 graduated to
+ * the selectable dosing engine; corrected 2026-06-28.)
+ *
+ * Architecture (see `boost_v5_redesign_proposal.md`):
+ *   Phase 1 — state estimation (meal_signal_score → MealHypothesis state machine → AggressionBudget)
+ *   Phase 2 — single decision rule (aggression_budget × meal_action_multiplier)
+ *   Phase 3 — ordered safety gates (hard gates → soft gates ordered → final clamp)
+ *
+ * Design tenets:
+ *   - Minimal user settings: ≤3 user-facing knobs; ~14–15 internal constants frozen at release.
+ *   - Sensitivity inheritance: baseInsulinReq is Boost-flavoured oref (DynISF + 7D TDD with W8H
+ *     pull-down + TDD-anchored EMA sensitivity + autosens + hour-of-day ISF + TempTargets).
+ *     V5 contains NO sensitivity logic of its own.
+ *   - State persistence: MealHypothesis persists across cycles. All reset paths explicit
+ *     (reboot, pump disconnect, loop suspend, profile switch, time jump > 30 min).
+ *
+ * Reference documents in this directory:
+ *   - `MIGRATION.md`  — V4.4.1 → V5 mechanism mapping (where did Tier 5 go?)
+ *   - `V1_VS_V5.md`   — V1 → V5 side-by-side comparison (architecture, settings, safety,
+ *                       brake stacking, observability). The authoritative answer to
+ *                       "what does V5 do differently from the original Boost?"
+ *
+ * V4 retention audit results are recorded in the V5 redesign proposal and migration doc.
+ */
+@Singleton
+open class OpenAPSBoostV5Plugin @Inject constructor(
+    aapsLogger: AAPSLogger,
+    rh: ResourceHelper,
+    private val config: Config,
+    private val preferences: Preferences,
+    private val determineBasalBoostV5: DetermineBasalBoostV5,
+    // Provider breaks the DI cycle (OpenAPSBoostPlugin injects Provider<OpenAPSBoostV5Plugin> for runShadow).
+    private val openAPSBoostEngine: Provider<OpenAPSBoostPlugin>,
+    // Auto-config from V1 history on first activation (2026-06-26).
+    private val persistenceLayer: PersistenceLayer,
+    private val tddCalculator: TddCalculator,
+    private val constraintsChecker: ConstraintsChecker,
+    private val dateUtil: DateUtil,
+    private val uiInteraction: UiInteraction,
+    // @Singleton — same instance the V1 engine scored this cycle; its cached feature vector powers
+    // the projected-IOB re-score for Phase-3 postActionRiskCheck. (2026-07-02)
+    private val boostRiskModel: BoostRiskModel,
+) : PluginBase(
+    PluginDescription()
+        .mainType(PluginType.APS)
+        .fragmentClass(OpenAPSFragment::class.java.name)
+        .pluginIcon(app.aaps.core.ui.R.drawable.ic_generic_icon)
+        .pluginName(R.string.openaps_boost_v5)
+        .shortName(R.string.boost_v5_shortname)
+        .preferencesId(PluginDescription.PREFERENCE_SCREEN)
+        .preferencesVisibleInSimpleMode(false)
+        .showInList { config.APS }
+        .description(R.string.description_boost_v5),
+    aapsLogger, rh
+), APS, PluginConstraints {
+
+    override val algorithm = APSResult.Algorithm.BOOST
+    // Reflect the engine's result LIVE (not a post-invoke copy): runEngine fires
+    // EventAPSCalculationFinished mid-run, before invoke() returns, so a copy would let GUI
+    // listeners read a stale/null result on that event. Delegating getters avoid the race.
+    override var lastAPSResult: APSResult?
+        get() = openAPSBoostEngine.get().lastAPSResult
+        set(_) {}
+    override var lastAPSRun: Long
+        get() = openAPSBoostEngine.get().lastAPSRun
+        set(_) {}
+
+    /** State persistence across cycles. Initialised lazily on first access. */
+    private val stateStore: V5StateStore by lazy { V5StateStore(preferences) }
+
+    /**
+     * "Boost V5" is the selectable face of the shared Boost engine. It runs the full V1 engine
+     * with the V5 observe-confirm-commit SMB override ACTIVE, then exposes the engine's result as
+     * its own. V5 owns no basal/prediction logic — it delegates to [OpenAPSBoostPlugin.runEngine]
+     * (v5Active=true) and inherits the entire sensitivity/engine stack via OapsProfileBoost. The
+     * engine still calls V5's [runShadow] internally; v5Active=true is what lets that decision
+     * override the SMB. Selecting plain "Boost" runs the same engine with v5Active=false.
+     */
+    override fun invoke(initiator: String, tempBasalFallback: Boolean) {
+        // First-activation: seed the V5 knobs from the user's own V1 history (before the first dose
+        // this cycle, so the engine picks up the values immediately). One-shot, guarded, never
+        // overrides a knob the user already tuned.
+        runCatching { maybeAutoConfigure() }
+            .onFailure { aapsLogger.error(LTag.APS, "BoostV5 auto-config failed (non-fatal)", it) }
+        // Run the shared engine with the V5 override active. lastAPSResult/lastAPSRun delegate to
+        // the engine (see above), so the result is exposed the instant runEngine sets it.
+        openAPSBoostEngine.get().runEngine(initiator, tempBasalFallback, v5Active = true)
+    }
+
+    /**
+     * Populate the V5 knobs from the user's last-14-day V1 dosing + glycaemia the first time V5 runs
+     * active. Suggestion-only: writes a knob ONLY if the user hasn't already set it (getIfExists ==
+     * null). If there isn't enough history yet, does nothing and leaves the flag UNSET so it retries
+     * on a later cycle once data accrues. Never changes the dosing path itself — only its settings.
+     */
+    private fun maybeAutoConfigure() {
+        if (preferences.get(BooleanKey.ApsBoostV5AutoConfigDone)) return
+
+        val now = dateUtil.now()
+        val start = now - 14L * 24 * 60 * 60 * 1000
+
+        // TDD (median over available days) + days-of-data.
+        val tdds = tddCalculator.calculate(14, allowMissingDays = true)
+        val tddValues = mutableListOf<Double>()
+        if (tdds != null) for (i in 0 until tdds.size()) {
+            val t = tdds.valueAt(i)
+            val total = if (t.totalAmount > 0) t.totalAmount else t.basalAmount + t.bolusAmount
+            if (total > 0) tddValues.add(total)
+        }
+        val tddMedian = median(tddValues)
+        val daysWithData = tddValues.size
+
+        // Boluses split into manual (meal) vs SMB.
+        val boluses = persistenceLayer.getBolusesFromTimeToTime(start, now, true)
+        val manual = boluses.filter { it.type == BS.Type.NORMAL && it.amount > 0 }.map { it.amount }
+        val smb = boluses.filter { it.type == BS.Type.SMB && it.amount > 0 }.map { it.amount }
+
+        // Glycaemia (TBR / severe / mean) from CGM.
+        val bgs = persistenceLayer.getBgReadingsDataFromTimeToTime(start, now, true)
+        val n = bgs.size
+        val tbr70 = if (n > 0) 100.0 * bgs.count { it.value in 1.0..69.9 } / n else 0.0
+        val sev54 = if (n > 0) 100.0 * bgs.count { it.value in 1.0..53.9 } / n else 0.0
+        val meanBg = if (n > 0) bgs.sumOf { it.value } / n else 0.0
+
+        val suggestion = BoostV5AutoConfig.compute(
+            BoostV5AutoConfig.V1Profile(
+                daysWithData = daysWithData, bgReadingCount = n, tddMedianU = tddMedian,
+                manualBolusesU = manual, smbAmountsU = smb,
+                tbrBelow70Pct = tbr70, timeBelow54Pct = sev54, meanGlucoseMgdl = meanBg,
+                currentMaxIobU = constraintsChecker.getMaxIOBAllowed().value(),
+                currentMaxBolusU = constraintsChecker.getMaxBolusAllowed().value()
+            )
+        )
+        if (suggestion == null) {
+            aapsLogger.info(LTag.APS, "BoostV5 auto-config: insufficient V1 history (days=$daysWithData, bg=$n) — will retry")
+            return
+        }
+
+        // Apply only knobs the user (or a preset) hasn't already set. Per-knob & independent — a
+        // preset value is KEPT and never blocks the others (see BoostV5AutoConfigApply, unit-tested).
+        val applied = mutableListOf<String>()
+        BoostV5AutoConfigApply.applyAutoConfig(
+            BoostV5AutoConfigApply.managedDoubleKnobs(suggestion),
+            isSet = { preferences.getIfExists(it) != null },
+            put = { key, value -> preferences.put(key, value) }
+        ).forEach { (key, value) -> applied += "${key.key}=$value" }
+        if (preferences.getIfExists(BooleanKey.ApsBoostV5FastCarbConfirm) == null) {
+            preferences.put(BooleanKey.ApsBoostV5FastCarbConfirm, suggestion.fastCarbConfirm)
+            applied += "fastCarbConfirm=${suggestion.fastCarbConfirm}"
+        }
+
+        preferences.put(BooleanKey.ApsBoostV5AutoConfigDone, true)
+        aapsLogger.info(LTag.APS, "BoostV5 auto-config applied [$applied]; rationale: ${suggestion.rationale}")
+        // Only surface a banner if we ACTUALLY changed something. If every knob was already tuned by
+        // the user, putDoubleIfUnset is a no-op (applied is empty) — announcing "configured" then
+        // changing nothing was the confusing behaviour Tim hit. One concise, readable line per knob.
+        if (applied.isNotEmpty()) {
+            val pretty = applied.joinToString("\n") { "• " + it.removePrefix("ApsBoostV5").removePrefix("ApsBoost") }
+            uiInteraction.addNotification(
+                Notification.USER_MESSAGE,
+                "Boost V6 set ${applied.size} setting(s) from your last 14 days (your other settings were kept):\n$pretty",
+                Notification.INFO
+            )
+        }
+    }
+
+    private fun median(xs: List<Double>): Double {
+        if (xs.isEmpty()) return 0.0
+        val s = xs.sorted()
+        return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2.0
+    }
+
+    // Enable/show under the same condition as plain Boost (temp-basal-capable pump) — delegate to
+    // the engine so the two plugins stay in lock-step.
+    override fun specialEnableCondition(): Boolean = openAPSBoostEngine.get().specialEnableCondition()
+    override fun specialShowInListCondition(): Boolean = openAPSBoostEngine.get().specialShowInListCondition()
+
+    /**
+     * Sidecar shadow runner. Called by V4.4.1 (`OpenAPSBoostV3MLG3Plugin.invoke()`) with the
+     * inputs and result V4.4.1 just produced. V5 sees exactly what V4.4.1 saw — no duplication
+     * of input gathering, no risk of input drift between the two algorithms.
+     *
+     * V5 reads:
+     *  - V4.4.1's RT for `eventualBG`, `insulinReq` (used as `baseInsulinReq`), `mlHypoRisk`,
+     *    `mlMealLikely` — V4.4.1 already ran the ML predictions.
+     *  - GlucoseStatus for `delta`, `shortAvgDelta`, `longAvgDelta`, `glucose`.
+     *  - OapsProfileBoost for `target_bg`, `boost_maxIOB`, `recentLowBG`, `lgsThreshold`,
+     *    and the `v5_*` activity fields V4.4.1 fills (exerciseActive, inPostExerciseWindow).
+     *
+     * V5 computes:
+     *  - `delta_accl` from delta + shortAvgDelta with V3's denominator floor.
+     *  - The 3-cycle deltaHistory from longAvgDelta / shortAvgDelta / delta.
+     *  - Its own meal_signal_score, MealHypothesis transition, AggressionBudget, action
+     *    multiplier, Phase 3 gates via [determineBasalBoostV5.decide].
+     *
+     * Output: V5 RT JSON logged via aapsLogger at INFO with prefix "BoostV5_RT:" — Tim greps
+     * logs to compare V5 shadow decisions against V4.4.1's actual delivery.
+     *
+     * Safety: any exception is caught and logged; V5 never propagates an error to V4.4.1.
+     */
+    fun runShadow(
+        rT: RT,
+        glucoseStatus: GlucoseStatus,
+        iobArray: Array<IobTotal>,
+        oapsProfile: OapsProfileBoost,
+        pumpBolusStep: Double,
+        activeMode: Boolean = false,
+        microBolusAllowed: Boolean = true,
+        flatBGsDetected: Boolean = false,
+        asleep: Boolean = false,
+    ): V5Decision? {
+        return try {
+            val priorState = stateStore.load()
+            val inputs = buildInputs(rT, glucoseStatus, iobArray, oapsProfile, pumpBolusStep, activeMode, microBolusAllowed, flatBGsDetected, asleep)
+            val decision = determineBasalBoostV5.decide(inputs, priorState)
+            stateStore.save(decision.newPersistedState)
+
+            // Mutate V4.4.1's rT to attach V5 fields. The same rT instance is referenced by
+            // V4.4.1's DetermineBasalResult.result and gets serialised via RT.serialize() when
+            // LoopPlugin uploads NS deviceStatus — V5's fields ride along automatically.
+            // V5's runShadow runs BEFORE V4.4.1 fires EventAPSCalculationFinished so any
+            // listener sees the populated rT.
+            rT.boostV5_score = decision.score
+            rT.boostV5_state = decision.mealHypothesis.name
+            rT.boostV5_age = decision.mealHypothesisAge
+            rT.boostV5_budget = decision.aggressionBudget.budget
+            rT.boostV5_actionMult = decision.actionMultiplier
+            rT.boostV5_finalDose = decision.finalDose
+            // Dose-chain intermediates (2026-07-10) so an offline port can be fidelity-validated
+            // stage-by-stage: raw(budget×actionMult) → doseAfterCaps → doseAfterBrakes → finalDose.
+            rT.boostV5_velocityFactor = decision.velocityFactor
+            rT.boostV5_doseAfterCaps = decision.insulinToDeliver
+            rT.boostV5_doseAfterBrakes = decision.phase3.finalDose
+            rT.boostV5_gateReduction = formatGateReduction(decision)
+            rT.boostV5_active = activeMode   // true => V5 is the selected/active doser (drives the V5 overview/widget)
+
+            val rtJson = v5DecisionToRtJson(decision)
+            aapsLogger.info(LTag.APS, "BoostV5_RT: ${rtJson} actual_smb=${rT.units ?: 0.0} actual_insulinReq=${rT.insulinReq ?: 0.0} activeMode=$activeMode")
+            decision
+        } catch (e: Throwable) {
+            // Never let V5 break V4.4.1. Log and continue. Null → caller leaves V1's dose intact.
+            aapsLogger.error(LTag.APS, "BoostV5 shadow error", e)
+            null
+        }
+    }
+
+    /**
+     * Short-horizon minGuardBG for V5's hard safety gate (2026-05-15 fix).
+     *
+     * V4.4.x's `rT.minGuardBG` is `min()` taken over the full 4-hour prediction horizon. The
+     * IOB-only forecast tail regularly dips to absurd lows (39 mg/dL is common) even when the
+     * next 30 minutes is fine — reading this value caused V5's `HARD:min_guard_bg` to fire on
+     * **50.4%** of cycles in the shadow window 2026-05-07 → 2026-05-15 (per
+     * `boost_2026-05-14_evening_excursion.md` and the 5-fixes review).
+     *
+     * The hard gate is supposed to mean "imminent hypo, do not dose". 30 minutes is the
+     * appropriate window — a basal cutoff issued now can plausibly prevent a hypo 30 min out;
+     * the 4h-tail forecast is not actionable.
+     *
+     * Returns the min over the next 30 min (6 prediction points) of all available prediction
+     * series, or null if no prediction array is available (caller falls back to V4.4.x's
+     * `rT.minGuardBG`, then to current BG).
+     */
+    private fun shortHorizonMinGuard(rT: RT): Double? {
+        val pred = rT.predBGs ?: return null
+        val series = listOfNotNull(pred.IOB, pred.UAM, pred.ZT, pred.COB)
+        if (series.isEmpty()) return null
+        // Take min over the first 6 points (30 min at 5-min cycles) of every series, then
+        // take the min across all series. Returns the worst-case 30-min-horizon prediction.
+        val mins = series.mapNotNull { it.take(6).minOrNull()?.toDouble() }
+        return mins.minOrNull()
+    }
+
+    /** Same compact summary used in the log line and in `v5DecisionToRtJson`'s gate string. */
+    private fun formatGateReduction(decision: V5Decision): String {
+        val parts = mutableListOf<String>()
+        decision.phase3.reductions.iobHeadroomBrake.takeIf { it < 1.0 }?.let { parts.add("iobHeadroom:${"%.2f".format(java.util.Locale.US, it)}") }
+        decision.phase3.reductions.postActionRiskCheck.takeIf { it < 1.0 }?.let { parts.add("postAction:${"%.2f".format(java.util.Locale.US, it)}") }
+        decision.phase3.reductions.decelerationBrake.takeIf { it < 1.0 }?.let { parts.add("decel:${"%.2f".format(java.util.Locale.US, it)}") }
+        decision.phase3.reductions.sensorQualityCheck.takeIf { it < 1.0 }?.let { parts.add("sensor:${"%.2f".format(java.util.Locale.US, it)}") }
+        decision.phase3.reductions.hardGateFired?.let { parts.add("HARD:$it") }
+        if (decision.phase3.reductions.maxIobClampApplied) parts.add("maxIOB")
+        if (decision.phase3.reductions.dynamicSpikeCapped) parts.add("spike")
+        return parts.joinToString(",").ifEmpty { "none" }
+    }
+
+    private fun buildInputs(
+        rT: RT,
+        gs: GlucoseStatus,
+        iobArray: Array<IobTotal>,
+        opb: OapsProfileBoost,
+        pumpBolusStep: Double,
+        activeMode: Boolean,
+        microBolusAllowed: Boolean,
+        flatBGsDetected: Boolean,
+        asleep: Boolean = false,
+    ): V5Inputs {
+        // delta_accl with V3's denominator floor — `max(|shortAvgDelta|, 2.0)` — carried over
+        // verbatim from V3 input preprocessing.
+        val deltaAccl = 100.0 * (gs.delta - gs.shortAvgDelta) / max(abs(gs.shortAvgDelta), 2.0)
+
+        // 3-cycle delta history from glucose status. longAvgDelta is a longer-window average
+        // so it's a reasonable proxy for "two cycles ago"; combined with shortAvgDelta and
+        // current delta, deltaDeclining can reliably check the 2-cycle decline pattern.
+        val deltaHistory = listOf(gs.longAvgDelta, gs.shortAvgDelta, gs.delta)
+
+        // Fix 4 (2026-05-22): cumulative rise over ~30 min for slow-meal detection. shortAvgDelta
+        // is per-5-min-cycle averaged over the 2.5–17.5 min lookback window (DeltaCalculator).
+        // Multiplying by 6 projects 30 min of accumulated rise at the current cycle's rate.
+        // Clamped non-negative — falling BG produces no sustained-rise signal.
+        val cumulativeRise30min = max(0.0, gs.shortAvgDelta * 6.0)
+
+        // baseInsulinReq directly from V4.4.1's computed value. V4.4.1 used the Boost-flavoured
+        // formula `(min(minPredBG, eventualBG) - target_bg) / future_sens` with DynISF +
+        // 7D-only TDD + EMA sensitivity all baked in. V5 trusts this number.
+        val baseInsulinReq = (rT.insulinReq ?: 0.0).coerceAtLeast(0.0)
+
+        val iob = iobArray.firstOrNull()?.iob ?: 0.0
+
+        val hour = LocalTime.now(ZoneId.systemDefault()).hour
+
+        // V0 SHADOW MODE: enableSmbPreChecks is permissive — V5 makes its own decision and the
+        // operator compares against V4.4.1's actual delivery. Earlier code derived this from
+        // `(units > 0) OR (insulinReq <= 0)`, but that returns false when V4.4.1 had a small
+        // insulinReq that rounded to units=0 (e.g. insulinReq=0.01U with roundSMBTo=0.05). In
+        // shadow we want V5's decision visible regardless. V5's other hard gates (minGuardBg
+        // via rT.minGuardBG, maxIOB clamp, maxDelta) already cover safety. When V5 graduates
+        // to alpha (active APS), this becomes a real V5-side enableSMB check.
+        // ACTIVE-DOSING ALPHA (2026-06-11): gate on V1's real SMB permission (microBolusAllowed) so
+        // V5 can only dose on cycles V1 itself permits an SMB — V1 is the outer safety envelope.
+        // Shadow mode (activeMode=false) keeps the permissive value so shadow telemetry is unchanged.
+        val enableSmbPreChecks = if (activeMode) microBolusAllowed else true
+
+        return V5Inputs(
+            delta = gs.delta,
+            shortAvgDelta = gs.shortAvgDelta,
+            deltaAccl = deltaAccl,
+            bg = gs.glucose,
+            eventualBg = rT.eventualBG ?: gs.glucose,
+            targetBg = opb.target_bg,
+            maxDelta = abs(gs.delta),
+            // minGuardBg: V4.4.1's smart-selected predicted-low (COB/UAM/IOB-blended per the rules
+            // at DetermineBasalBoostV3MLG3.kt:799-808). Reading rT.minGuardBG directly avoids the
+            // bug from a previous attempt that did `min(predBGs.IOB+UAM+ZT)` over the full prediction
+            // horizon — that picked up the IOB-only forecast tail (e.g. 39 mg/dL) and fired the V5
+            // hard gate every cycle even when V4.4.1's own minGuardBG was 92 mg/dL (well above 80).
+            minGuardBg = shortHorizonMinGuard(rT) ?: rT.minGuardBG ?: gs.glucose,
+            minGuardThreshold = opb.lgsThreshold?.toDouble() ?: 80.0,
+            deltaHistory = deltaHistory,
+            iob = iob,
+            // Hard-ceiling V5's IOB headroom to the system/oref maxIOB (opb.max_iob, already
+            // constraint-applied) so a higher ApsBoostMaxIob can never let V5 exceed the IOB limit
+            // V1 enforces. (Review 2026-06-26, LOW — defense-in-depth.)
+            maxIob = minOf(opb.boost_maxIOB, opb.max_iob),
+            baseInsulinReq = baseInsulinReq,
+            roundSmbTo = pumpBolusStep,
+            enableSmbPreChecks = enableSmbPreChecks,
+            mlHypoRisk = rT.mlHypoRisk,
+            mlMealLikely = rT.mlMealLikely,
+            // 2026-07-02: postActionRiskCheck LIVE. Re-scores the (singleton) risk model at
+            // projected IOB using this cycle's cached feature vector. Previously null since
+            // V0-shadow — but in ACTIVE mode V5 replaces rT.units AFTER V1's postSmbScale ran,
+            // so the delivered dose had neither damper. Null/unavailable → current risk
+            // (gate passes through unchanged).
+            riskAtProjectedIob = { projIob -> boostRiskModel.predictAtProjectedIob(projIob) ?: (rT.mlHypoRisk ?: 0.0) },
+            recentLowBg = opb.recentLowBG,
+            cumulativeRise30min = cumulativeRise30min,
+            hour = hour,
+            exerciseActive = opb.v5_exerciseActive,
+            inPostExerciseWindow = opb.v5_inPostExerciseWindow,
+            asleep = asleep,
+            fastCarbConfirmEnabled = preferences.get(BooleanKey.ApsBoostV5FastCarbConfirm),
+            sensorQualityOk = if (activeMode) !flatBGsDetected else true,
+            profileSwitched = false,           // deferred reset trigger (microBolusAllowed gates actual dosing)
+            pumpDisconnected = false,
+            loopSuspended = false,
+            timeJumpMinutes = 0.0,
+            aggressionUserKnob = aggressionKnob,
+            hypoCautionUserKnob = hypoCautionKnob,
+            sensitivityUserKnob = sensitivityKnob,
+            confirmedCapU = preferences.get(DoubleKey.ApsBoostV5ConfirmedCapU),
+            committedCapU = preferences.get(DoubleKey.ApsBoostV5CommittedCapU),
+        )
+    }
+
+    // When "Boost V5" is the active APS, GlucoseStatusProviderImpl + overview/Wear/Android Auto/
+    // lockscreen widgets call these on activeAPS. V5 owns no glucose/ISF logic — delegate to the
+    // engine so they behave identically to plain "Boost". (Returning null/the interface default
+    // here broke those integrations: they showed stale data with only raw glucose. 2026-06-15.)
+    override fun getGlucoseStatusData(allowOldData: Boolean): GlucoseStatus? =
+        openAPSBoostEngine.get().getGlucoseStatusData(allowOldData)
+
+    override fun supportsDynamicIsf(): Boolean = openAPSBoostEngine.get().supportsDynamicIsf()
+    override fun getIsfMgdl(profile: Profile, caller: String): Double? = openAPSBoostEngine.get().getIsfMgdl(profile, caller)
+    override fun getAverageIsfMgdl(timestamp: Long, caller: String): Double? = openAPSBoostEngine.get().getAverageIsfMgdl(timestamp, caller)
+    override fun getSensitivityOverviewString(): String? = openAPSBoostEngine.get().getSensitivityOverviewString()
+
+    // ── Delegated to the engine ─────────────────────────────────────────────────────────────
+    // When "Boost V5" is the active APS, V1 (the engine) is DISABLED, so the constraints framework
+    // (ConstraintsCheckerImpl: `if (!p.isEnabled()) continue`) skips V1 entirely and only polls V5.
+    // V5 owns no constraint/config/lifecycle logic, so it must forward all of it to the engine —
+    // otherwise Boost's night-mode SMB gate, UAM/autosens limits, maxIOB/maxBasal caps, the
+    // post-calibration SMB block, and settings export would silently vanish under V5. (2026-06-15.)
+
+    override fun isSMBModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> = openAPSBoostEngine.get().isSMBModeEnabled(value)
+    override fun isUAMEnabled(value: Constraint<Boolean>): Constraint<Boolean> = openAPSBoostEngine.get().isUAMEnabled(value)
+    override fun isAutosensModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> = openAPSBoostEngine.get().isAutosensModeEnabled(value)
+    override fun isSuperBolusEnabled(value: Constraint<Boolean>): Constraint<Boolean> = openAPSBoostEngine.get().isSuperBolusEnabled(value)
+    override fun applyMaxIOBConstraints(maxIob: Constraint<Double>): Constraint<Double> = openAPSBoostEngine.get().applyMaxIOBConstraints(maxIob)
+    override fun applyBasalConstraints(absoluteRate: Constraint<Double>, profile: Profile): Constraint<Double> = openAPSBoostEngine.get().applyBasalConstraints(absoluteRate, profile)
+
+    // Lifecycle: forward so the engine's EventCalibrationDetected subscription (post-calibration
+    // SMB block) is live whenever Boost V5 is the running plugin.
+    override fun onStart() { super.onStart(); openAPSBoostEngine.get().onStart() }
+    override fun onStop() { openAPSBoostEngine.get().onStop(); super.onStop() }
+
+    override fun configuration(): JSONObject = openAPSBoostEngine.get().configuration()
+
+    override fun applyConfiguration(configuration: JSONObject) = openAPSBoostEngine.get().applyConfiguration(configuration)
+
+    // Dynamic pref visibility (SMB-with-COB/LowTt/AfterCarbs) — same shared SMB-safety switches
+    // appear on V5's screen, so run the engine's logic against V5's fragment.
+    override fun preprocessPreferences(preferenceFragment: PreferenceFragmentCompat) =
+        openAPSBoostEngine.get().preprocessPreferences(preferenceFragment)
+
+    /** V5's three (and only three) user-facing knobs, per the minimal-settings tenet. */
+    val aggressionKnob: Double get() = preferences.get(DoubleKey.ApsBoostV5Aggression)
+    val hypoCautionKnob: Double get() = preferences.get(DoubleKey.ApsBoostV5HypoCaution)
+
+    /**
+     * Sensitivity knob ∈ [0.8, 1.2] — per-user calibration multiplier on the aggression budget.
+     * Wired into [aggressionBudget] as of V6 (2026-06-15): the 4-user shadow backtest showed V5
+     * runs hot for some users (User D over-dosed before lows), so a live <1.0 trim (or >1.0 for
+     * resistant users) is warranted. This is the lever a future nightly per-user learner will
+     * drive (loop deferred — see boost_v6_delivery_plan Phase 3). Default 1.0 = no change.
+     */
+    val sensitivityKnob: Double get() = preferences.get(DoubleKey.ApsBoostV5Sensitivity)
+
+    override fun addPreferenceScreen(
+        preferenceManager: PreferenceManager,
+        parent: PreferenceScreen,
+        context: Context,
+        requiredKey: String?,
+    ) {
+        // Allow the V5 root, the Advanced parent, AND the shared engine sub-screen keys (rebuilt
+        // by name when navigated into; they now live nested under "Advanced").
+        if (requiredKey != null &&
+            requiredKey != "openapsboostv5_settings" &&
+            requiredKey != "boost_advanced_settings" &&
+            requiredKey != "absorption_smb_advanced" &&
+            requiredKey != "boost_default_aaps_settings" &&
+            requiredKey != "boost_dynisf_settings" &&
+            requiredKey != "openapsboost_dynamic_cr_settings" &&
+            requiredKey != "boost_exercise_settings" &&
+            requiredKey != "boost_stepcount_settings" &&
+            requiredKey != "boost_hr_integration_settings" &&
+            requiredKey != "boost_post_exercise_recovery_settings" &&
+            requiredKey != "boost_night_mode_settings" &&
+            requiredKey != "boost_safety_settings"
+        ) return
+        val category = PreferenceCategory(context)
+        parent.addPreference(category)
+        category.apply {
+            key = "openapsboostv5_settings"
+            title = rh.gs(R.string.openaps_boost_v5)
+            initialExpandedChildrenCount = 0
+        }
+        // ── Essentials (top level) — the handful most users touch. Aggression/HypoCaution are
+        //    auto-seeded by auto-config; everything else is auto-configured or learned and lives
+        //    under "Advanced" below. ──
+        category.addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV5Aggression, dialogMessage = R.string.boost_v5_aggression_summary, title = R.string.boost_v5_aggression_title))
+        category.addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV5HypoCaution, dialogMessage = R.string.boost_v5_hypo_caution_summary, title = R.string.boost_v5_hypo_caution_title))
+        category.addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostMaxIob, dialogMessage = R.string.boost_max_iob_summary, title = R.string.boost_max_iob_title))
+        category.addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsMaxBasal, dialogMessage = R.string.openapsma_max_basal_summary, title = R.string.openapsma_max_basal_title))
+        category.addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostNightModeEnabled, summary = R.string.boost_night_mode_enabled_summary, title = R.string.boost_night_mode_enabled_title))
+        category.addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsBoostNightModeBgOffset, dialogMessage = R.string.boost_night_mode_bg_offset_summary, title = R.string.boost_night_mode_bg_offset_title))
+        category.addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseSmb, summary = R.string.enable_smb_summary, title = R.string.enable_smb))
+        category.addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseUam, summary = R.string.enable_uam_summary, title = R.string.enable_uam))
+
+        // ── Advanced — advanced V6 dosing knobs + the full grouped-by-function engine tree.
+        //    Build it fully BEFORE attaching to the category. ──
+        val advanced = preferenceManager.createPreferenceScreen(context).apply {
+            key = "boost_advanced_settings"
+            title = rh.gs(app.aaps.core.ui.R.string.advanced_settings_title)
+            addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV5Sensitivity, dialogMessage = R.string.boost_v5_sensitivity_summary, title = R.string.boost_v5_sensitivity_title))
+            addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV5ConfirmedCapU, dialogMessage = R.string.boost_v5_confirmed_cap_summary, title = R.string.boost_v5_confirmed_cap_title))
+            addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV5CommittedCapU, dialogMessage = R.string.boost_v5_committed_cap_summary, title = R.string.boost_v5_committed_cap_title))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostV5FastCarbConfirm, summary = R.string.boost_v5_fast_carb_confirm_summary, title = R.string.boost_v5_fast_carb_confirm_title))
+            addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostV6PreMealTarget, summary = R.string.boost_v6_pre_meal_target_summary, title = R.string.boost_v6_pre_meal_target_title))
+            addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV6PreMealTargetMgdl, dialogMessage = R.string.boost_v6_pre_meal_target_mgdl_summary, title = R.string.boost_v6_pre_meal_target_mgdl_title))
+            addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostV6PreMealLeadMin, dialogMessage = R.string.boost_v6_pre_meal_lead_min_summary, title = R.string.boost_v6_pre_meal_lead_min_title))
+        }
+        // Shared engine settings nested under Advanced. includeEngineEssentials = false: the
+        // 6 essentials above are NOT repeated inside the engine sub-screens (no duplicate keys).
+        openAPSBoostEngine.get().addBoostEngineCategories(preferenceManager, advanced, context, includeEngineEssentials = false)
+        category.addPreference(advanced)
+    }
+}

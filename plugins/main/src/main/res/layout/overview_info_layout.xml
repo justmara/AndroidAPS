@@ -167,6 +167,35 @@
 
         </TableRow>
 
+        <TableRow
+            android:id="@+id/bg_accel_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:textAlignment="textEnd"
+                android:text="a: "
+                android:contentDescription="acceleration"
+                android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:id="@+id/bg_accel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:textAlignment="textEnd"
+                tools:text="n/a"
+                android:textAppearance="@style/TextAppearance.AppCompat.Small"
+                tools:ignore="HardcodedText" />
+
+        </TableRow>
+
     </TableLayout>
 
     <TextView

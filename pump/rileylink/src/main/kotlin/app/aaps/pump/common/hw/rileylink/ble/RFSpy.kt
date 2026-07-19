@@ -157,7 +157,7 @@ class RFSpy @Inject constructor(
     }
 
     private fun writeToDataRaw(bytes: ByteArray, responseTimeoutMs: Int): ByteArray? {
-        SystemClock.sleep(1)
+        SystemClock.sleep(if (rileyLinkBle.isFastMode) 1 else 100)
         // FIXME drain read queue?
         var junkInBuffer = reader.poll(0)
 
