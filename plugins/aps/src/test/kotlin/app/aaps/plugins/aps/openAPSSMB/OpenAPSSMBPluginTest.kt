@@ -5,6 +5,7 @@ import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.profiling.Profiler
+import app.aaps.core.interfaces.stats.DynIsfCalculator
 import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.plugins.aps.dynamiccr.DynamicCarbRatioCalculator
@@ -22,6 +23,7 @@ class OpenAPSSMBPluginTest : TestBaseWithProfile() {
     @Mock lateinit var determineBasalSMB: DetermineBasalSMB
     @Mock lateinit var bgQualityCheck: BgQualityCheck
     @Mock lateinit var tddCalculator: TddCalculator
+    @Mock lateinit var dynIsfCalculator: DynIsfCalculator
     @Mock lateinit var uiInteraction: UiInteraction
     @Mock lateinit var profiler: Profiler
     private lateinit var openAPSSMBPlugin: OpenAPSSMBPlugin
@@ -31,7 +33,8 @@ class OpenAPSSMBPluginTest : TestBaseWithProfile() {
             injector, aapsLogger, rxBus, constraintChecker, rh, profileFunction, profileUtil, config, activePlugin,
             iobCobCalculator, hardLimits, preferences, dateUtil, processedTbrEbData, persistenceLayer, glucoseStatusProvider,
             tddCalculator, bgQualityCheck, uiInteraction, determineBasalSMB, profiler, GlucoseStatusCalculatorSMB(aapsLogger, iobCobCalculator, dateUtil, decimalFormatter, deltaCalculator), apsResultProvider,
-            DynamicCarbRatioCalculator()
+            DynamicCarbRatioCalculator(),
+            dynIsfCalculator
         )
     }
 

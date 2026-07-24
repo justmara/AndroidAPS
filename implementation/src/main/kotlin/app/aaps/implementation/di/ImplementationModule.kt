@@ -29,6 +29,7 @@ import app.aaps.core.interfaces.pump.WarnColors
 import app.aaps.core.interfaces.receivers.ReceiverStatusStore
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.stats.DexcomTirCalculator
+import app.aaps.core.interfaces.stats.DynIsfCalculator
 import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.stats.TirCalculator
 import app.aaps.core.interfaces.storage.Storage
@@ -72,6 +73,7 @@ import app.aaps.implementation.resources.IconsProviderImplementation
 import app.aaps.implementation.resources.ResourceHelperImpl
 import app.aaps.implementation.sharedPreferences.PreferencesImpl
 import app.aaps.implementation.stats.DexcomTirCalculatorImpl
+import app.aaps.implementation.stats.DynIsfCalculatorImpl
 import app.aaps.implementation.stats.TddCalculatorImpl
 import app.aaps.implementation.stats.TirCalculatorImpl
 import app.aaps.implementation.storage.FileStorage
@@ -124,6 +126,7 @@ class ImplementationModule {
 
         @Binds fun bindTrendCalculatorInterface(trendCalculator: TrendCalculatorImpl): TrendCalculator
         @Binds fun bindTddCalculatorInterface(tddCalculator: TddCalculatorImpl): TddCalculator
+        @Binds fun bindDynIsfCalculatorInterface(dynIsfCalculator: DynIsfCalculatorImpl): DynIsfCalculator
         @Binds fun bindTirCalculatorInterface(tirCalculator: TirCalculatorImpl): TirCalculator
         @Binds fun bindDexcomTirCalculatorInterface(dexcomTirCalculator: DexcomTirCalculatorImpl): DexcomTirCalculator
         @Binds fun bindPumpSyncInterface(pumpSyncImplementation: PumpSyncImplementation): PumpSync

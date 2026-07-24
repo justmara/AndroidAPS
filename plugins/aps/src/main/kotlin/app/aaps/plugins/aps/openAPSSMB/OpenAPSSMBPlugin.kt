@@ -20,6 +20,8 @@ import app.aaps.core.interfaces.aps.AutosensResult
 import app.aaps.core.interfaces.aps.CurrentTemp
 import app.aaps.core.interfaces.aps.GlucoseStatus
 import app.aaps.core.interfaces.aps.GlucoseStatusSMB
+import app.aaps.core.interfaces.stats.DynIsfCalculator
+import app.aaps.core.interfaces.stats.DynIsfResult
 import app.aaps.core.interfaces.aps.OapsProfile
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
 import app.aaps.core.interfaces.configuration.Config
@@ -61,7 +63,6 @@ import app.aaps.core.objects.extensions.plannedRemainingMinutes
 import app.aaps.core.objects.extensions.put
 import app.aaps.core.objects.extensions.store
 import app.aaps.core.objects.extensions.target
-import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.utils.MidnightUtils
 import app.aaps.core.utils.extensions.put
 import app.aaps.core.validators.preferences.AdaptiveDoublePreference
@@ -75,14 +76,12 @@ import app.aaps.plugins.aps.R
 import app.aaps.plugins.aps.dynamiccr.DynamicCarbRatioCalculator
 import app.aaps.plugins.aps.events.EventOpenAPSUpdateGui
 import app.aaps.plugins.aps.events.EventResetOpenAPSGui
-import app.aaps.plugins.aps.openAPS.TddStatus
 import dagger.android.HasAndroidInjector
 import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 import kotlin.math.floor
-import kotlin.math.ln
 
 @Singleton
 open class OpenAPSSMBPlugin @Inject constructor(
@@ -109,7 +108,8 @@ open class OpenAPSSMBPlugin @Inject constructor(
     private val profiler: Profiler,
     private val glucoseStatusCalculatorSMB: GlucoseStatusCalculatorSMB,
     private val apsResultProvider: Provider<APSResult>,
-    private val dynamicCarbRatioCalculator: DynamicCarbRatioCalculator
+    private val dynamicCarbRatioCalculator: DynamicCarbRatioCalculator,
+    private val dynIsfCalculator: DynIsfCalculator
 ) : PluginBase(
     PluginDescription()
         .mainType(PluginType.APS)
@@ -246,154 +246,13 @@ open class OpenAPSSMBPlugin @Inject constructor(
             return Pair("HIT", cached)
         }
 
-        val dynIsfResult = calculateRawDynIsf(profile)
+        val dynIsfResult = dynIsfCalculator.calculate(profile)
         if (!dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseProfileSens)) return Pair("TDD miss", null)
         // no cached result found, let's calculate the value
         //aapsLogger.debug("calculateVariableIsf $caller CAL ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $sensitivity")
         dynIsfCache.put(key, dynIsfResult.variableSensitivity)
         if (dynIsfCache.size() > 1000) dynIsfCache.clear()
         return Pair("CALC", dynIsfResult.variableSensitivity)
-    }
-
-    internal class DynIsfResult {
-
-        var tdd1D: Double? = null
-        var tdd7D: Double? = null
-        var tddLast24H: Double? = null
-        var tddLast4H: Double? = null
-        var tddLast8to4H: Double? = null
-        var tdd: Double? = null
-        // raw weighted TDD before the DynISF adjustment factor — reused by Dynamic CR so it works whenever any TDD exists
-        var tddRaw: Double? = null
-        var variableSensitivity: Double? = null
-        var insulinDivisor: Int = 0
-
-        var tddLast24HCarbs = 0.0
-        var tdd7DDataCarbs = 0.0
-        var tdd7DAllDaysHaveCarbs = false
-
-        fun tddPartsCalculated() = tdd1D != null && tdd7D != null && tddLast24H != null && tddLast4H != null && tddLast8to4H != null
-        fun tddQuickCalculated() = tddLast4H != null && tddLast8to4H != null
-
-        fun log() =
-            "DynIsfResult: tdd1D=$tdd1D tdd7D=$tdd7D tddLast24H=$tddLast24H tddLast4H=$tddLast4H tddLast8to4H=$tddLast8to4H tdd=$tdd variableSensitivity=$variableSensitivity insulinDivisor=$insulinDivisor tdd7DDataCarbs=$tdd7DDataCarbs tdd7DAllDaysHaveCarbs=$tdd7DAllDaysHaveCarbs"
-    }
-
-    private fun capGlucose(glucoseStatus: GlucoseStatus): Double {
-        // inspired by justmara
-        val bgCap = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.DynIsfBgCap))
-        return if (glucoseStatus.glucose > bgCap)
-            bgCap + ((glucoseStatus.glucose - bgCap) / 3)
-        else
-            glucoseStatus.glucose
-    }
-
-    private fun getInsulinDivisor(): Int {
-        val insulin = activePlugin.activeInsulin
-        return when {
-            insulin.peak > 65 -> 55 // rapid peak: 75
-            insulin.peak > 50 -> 65 // ultra rapid peak: 55
-            else              -> 75 // lyumjev peak: 45
-        }
-    }
-
-    private fun calculateRawDynIsf(profile: Profile): DynIsfResult {
-        val dynIsfResult = DynIsfResult()
-        val profileMultiplier = if (preferences.get(BooleanKey.DynIsfProfilePercentage))
-            100.0 / (profile as ProfileSealed.EPS).value.originalPercentage
-        else
-            1.0
-
-        // DynamicISF specific
-        // without these values DynISF doesn't work properly
-        val glucose = glucoseStatusProvider.glucoseStatusData?.let {capGlucose(it) }
-
-        dynIsfResult.tdd1D = tddCalculator.averageTDD(tddCalculator.calculate(1, allowMissingDays = false))?.data?.totalAmount
-        tddCalculator.averageTDD(tddCalculator.calculate(7, allowMissingDays = false))?.let {
-            dynIsfResult.tdd7D = it.data.totalAmount
-            dynIsfResult.tdd7DDataCarbs = it.data.carbs
-            dynIsfResult.tdd7DAllDaysHaveCarbs = it.allDaysHaveCarbs
-        }
-        tddCalculator.calculateDaily(-24, 0)?.also {
-            dynIsfResult.tddLast24H = it.totalAmount
-            dynIsfResult.tddLast24HCarbs = it.carbs
-        }
-        dynIsfResult.tddLast4H = tddCalculator.calculateDaily(-4, 0)?.totalAmount
-        dynIsfResult.tddLast8to4H = tddCalculator.calculateDaily(-8, -4)?.totalAmount
-        dynIsfResult.insulinDivisor = getInsulinDivisor()
-
-        val normalTarget = 100.0
-        var baseSensitivity = profile.getProfileIsfMgdl()
-
-        // Always calculate TDD, it's used not just in sensitivity calculation
-        val useTDD = !preferences.get(BooleanKey.DynIsfUseProfileSens)
-        if (dynIsfResult.tddPartsCalculated()) {
-            val tddStatus = TddStatus(dynIsfResult.tdd1D!!, dynIsfResult.tdd7D!!, dynIsfResult.tddLast24H!!, dynIsfResult.tddLast4H!!, dynIsfResult.tddLast8to4H!!)
-            val tddWeightedFromLast8H = ((1.4 * tddStatus.tddLast4H) + (0.6 * tddStatus.tddLast8to4H)) * 3
-            dynIsfResult.tdd = (tddWeightedFromLast8H * 0.33) + (tddStatus.tdd7D * 0.34) + (tddStatus.tdd1D * 0.33)
-        } else if (dynIsfResult.tddQuickCalculated()) {
-            aapsLogger.warn(LTag.APS, "Using quick TDD")
-            dynIsfResult.tdd = ((1.4 * dynIsfResult.tddLast4H!!) + (0.6 * dynIsfResult.tddLast8to4H!!)) * 3
-        }
-
-        dynIsfResult.tddRaw = dynIsfResult.tdd // raw weighted TDD (pre adjustment factor) for Dynamic CR
-        val adjFactor = preferences.get(IntKey.DynIsfAdjustmentFactor) / 100.0
-        if (dynIsfResult.tdd != null) dynIsfResult.tdd = dynIsfResult.tdd!! * adjFactor
-
-        if (useTDD) {
-            if (dynIsfResult.tdd == null) {
-                aapsLogger.error(LTag.APS, "Using TDD-based DynISF, but got no TDD")
-                return dynIsfResult
-            }
-
-            aapsLogger.debug(LTag.APS, "Using TDD base sensitivity")
-            baseSensitivity = Round.roundTo(1800.0 / (dynIsfResult.tdd!! * (ln((normalTarget / dynIsfResult.insulinDivisor) + 1))), 0.1)
-            if (preferences.get(BooleanKey.DynIsfProfilePercentage)) {
-                baseSensitivity *= profileMultiplier
-                aapsLogger.debug(LTag.APS, "Scaling TDD sensitivity by profile% - $profileMultiplier")
-            }
-        }
-
-        if (glucose == null) {
-            aapsLogger.error(LTag.APS, "Glucose is null")
-            return dynIsfResult
-        }
-
-        // Scale base sensitivity by TT if needed
-        var isTempTarget = false
-        var targetBg = profile.getTargetMgdl()
-        persistenceLayer.getTemporaryTargetActiveAt(dateUtil.now())?.let { tempTarget ->
-            isTempTarget = true
-            targetBg = hardLimits.verifyHardLimits(tempTarget.target(), app.aaps.core.ui.R.string.temp_target_value, HardLimits.LIMIT_TEMP_TARGET_BG[0], HardLimits.LIMIT_TEMP_TARGET_BG[1])
-        }
-        if (isTempTarget) {
-            if ((preferences.get(BooleanKey.ApsAutoIsfHighTtRaisesSens) && targetBg > normalTarget)
-                || (preferences.get(BooleanKey.ApsAutoIsfLowTtLowersSens) && targetBg < normalTarget)) {
-                val c = preferences.get(IntKey.ApsAutoIsfHalfBasalExerciseTarget) - normalTarget
-                if (c * (c + targetBg - normalTarget) > 0.0) {
-                    // coerceAtLeast/coerceAtMost return a new value; the previous `.apply { }` discarded
-                    // them, leaving the ratio unclamped. Chain the coerces so AutosensMin/Max actually bound it.
-                    val sensitivityRatio = Round.roundTo(
-                        (c / (c + targetBg - normalTarget))
-                            .coerceAtLeast(preferences.get(DoubleKey.AutosensMin))
-                            .coerceAtMost(preferences.get(DoubleKey.AutosensMax)),
-                        0.01
-                    )
-                    aapsLogger.debug(LTag.APS, "Scaling sensitivity by TT ratio: $sensitivityRatio")
-                    baseSensitivity /= sensitivityRatio
-                }
-            }
-        }
-
-        // Calculate variable sensitivity
-        val velocity = preferences.get(IntKey.DynIsfVelocity) / 100.0
-        val sbg = ln((glucose / dynIsfResult.insulinDivisor) + 1)
-        val scaler = ln((normalTarget / dynIsfResult.insulinDivisor) + 1) / sbg
-        val ratio = 1 - (1 - scaler) * velocity
-        dynIsfResult.variableSensitivity = baseSensitivity * ratio
-
-        aapsLogger.debug(LTag.APS, "multiplier=$profileMultiplier gluc=$glucose tdd=${dynIsfResult.tdd} (${adjFactor}x) baseSens=${baseSensitivity} velocity=$velocity -> sensRatio=${ratio} sens=${dynIsfResult.variableSensitivity}")
-        return dynIsfResult
     }
 
     private fun getSmbRatio(target: Double): Double {
@@ -454,7 +313,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         if (!hardLimits.checkHardLimits(pump.baseBasalRate, app.aaps.core.ui.R.string.current_basal_value, 0.01, hardLimits.maxBasal())) return
 
         // End of check, start gathering data
-        val dynIsfResult = calculateRawDynIsf(profile)
+        val dynIsfResult = dynIsfCalculator.calculate(profile)
         val dynIsfMode =
             preferences.get(BooleanKey.DynIsfEnabled) &&
                 hardLimits.checkHardLimits(preferences.get(IntKey.DynIsfAdjustmentFactor).toDouble(), R.string.dyn_isf_adjust_title, IntKey.DynIsfAdjustmentFactor.min.toDouble(), IntKey.DynIsfAdjustmentFactor.max.toDouble()) &&
