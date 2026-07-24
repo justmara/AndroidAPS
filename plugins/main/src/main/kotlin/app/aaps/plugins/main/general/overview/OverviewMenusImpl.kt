@@ -91,7 +91,7 @@ class OverviewMenusImpl @Inject constructor(
             }
         }
         CharTypeData.DEVSLOPE.visibility = { config.isDev() }
-        CharTypeData.VAR_SENS.visibility = { preferences.get(BooleanKey.ApsUseDynamicSensitivity) || (preferences.get(BooleanKey.ApsUseAutoIsfWeights) && config.isDev()) }
+        CharTypeData.VAR_SENS.visibility = { preferences.get(BooleanKey.DynIsfEnabled) || (preferences.get(BooleanKey.ApsUseAutoIsfWeights) && config.isDev()) }
         // AutoISF intermediate-factor graphs are only meaningful when AutoISF weights are active
         val autoIsfActive = { preferences.get(BooleanKey.ApsUseAutoIsfWeights) }
         CharTypeData.ACCE_ISF.visibility = autoIsfActive

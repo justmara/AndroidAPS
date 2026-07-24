@@ -200,7 +200,7 @@ class OverviewDataImpl @Inject constructor(
         val ratioUsed = request?.autosensResult?.ratio ?: 1.0
 
         return if (useAutosens) {
-            if (preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity))
+            if (preferences.get(BooleanKey.DynIsfAdjustSensitivity))
                 ratioUsed
             else
                 lastAutosensData?.autosensResult?.ratio ?: 1.0

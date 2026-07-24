@@ -735,13 +735,13 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
 
     override fun configuration(): JSONObject =
         JSONObject()
-            .put(BooleanKey.ApsUseDynamicSensitivity, preferences)
-            .put(IntKey.ApsDynIsfAdjustmentFactor, preferences)
+            .put(BooleanKey.DynIsfEnabled, preferences)
+            .put(IntKey.DynIsfAdjustmentFactor, preferences)
 
     override fun applyConfiguration(configuration: JSONObject) {
         configuration
-            .store(BooleanKey.ApsUseDynamicSensitivity, preferences)
-            .store(IntKey.ApsDynIsfAdjustmentFactor, preferences)
+            .store(BooleanKey.DynIsfEnabled, preferences)
+            .store(IntKey.DynIsfAdjustmentFactor, preferences)
     }
 
     // Rounds value to 'digits' decimal places
