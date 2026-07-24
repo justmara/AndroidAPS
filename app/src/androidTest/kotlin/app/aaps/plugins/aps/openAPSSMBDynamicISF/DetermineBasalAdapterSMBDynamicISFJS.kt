@@ -310,7 +310,7 @@ class DetermineBasalAdapterSMBDynamicISFJS(private val scriptReader: ScriptReade
 
         val tddWeightedFromLast8H = ((1.4 * tddLast4H) + (0.6 * tddLast8to4H)) * 3
         var tdd = (tddWeightedFromLast8H * 0.33) + (tdd7D * 0.34) + (tdd1D * 0.33)
-        val dynISFadjust = preferences.get(IntKey.ApsDynIsfAdjustmentFactor) / 100.0
+        val dynISFadjust = preferences.get(IntKey.DynIsfAdjustmentFactor) / 100.0
         tdd *= dynISFadjust
 
         val variableSensitivity = Round.roundTo(1800 / (tdd * (ln((glucoseStatus.glucose / insulinDivisor) + 1))), 0.1)
@@ -320,7 +320,7 @@ class DetermineBasalAdapterSMBDynamicISFJS(private val scriptReader: ScriptReade
         this.profile.put("TDD", tdd)
 
 
-        if (preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity))
+        if (preferences.get(BooleanKey.DynIsfAdjustSensitivity))
             autosensData.put("ratio", tddLast24H / tdd7D)
         else
             autosensData.put("ratio", 1.0)
