@@ -61,8 +61,8 @@ enum class IntKey(
     MaintenanceCleanupDays("maintenance_cleanup_days", 93, 7, 93, defaultedBySM = true),
     ActivityMonitorIdleStart("inactivity_idle_start", 22, 0, 23, defaultedBySM = true, dependency = BooleanKey.ActivityMonitorOvernight),
     ActivityMonitorIdleEnd("inactivity_idle_end", 6, 0, 23, defaultedBySM = true, dependency = BooleanKey.ActivityMonitorOvernight),
-    ApsDynIsfAdjustmentFactor("DynISFAdjust", 50, 1, 200, dependency = BooleanKey.ApsUseDynamicSensitivity, negativeDependency = BooleanKey.ApsDynIsfUseProfileSens),
-    ApsDynIsfVelocity("DynISFVelocity", 80, 1, 200, dependency = BooleanKey.ApsUseDynamicSensitivity),
+    DynIsfAdjustmentFactor("dynisf_adjustment_factor", 100, 1, 300, dependency = BooleanKey.DynIsfEnabled, negativeDependency = BooleanKey.DynIsfUseProfileSens),
+    DynIsfVelocity("dynisf_velocity", 100, 0, 200, dependency = BooleanKey.DynIsfEnabled),
     ApsDynamicCrFormula("dynamic_cr_formula", 0, 0, 1, dependency = BooleanKey.ApsUseDynamicCarbRatio),
     // Capped below 120: at 120 the logarithmic insulinFactor (120 - peak) collapses and inflates the ratio.
     ApsDynamicCrPeakTime("dynamic_cr_peak_time", 75, 35, 110, dependency = BooleanKey.ApsDynamicCrUseCustomPeakTime),
@@ -91,7 +91,6 @@ enum class IntKey(
     ApsBoostActivitySteps15("boost_activity_steps_15", 800, 0, 10000, defaultedBySM = true),
     ApsBoostActivitySteps30("boost_activity_steps_30", 1200, 0, 10000, defaultedBySM = true),
     ApsBoostActivitySteps60("boost_activity_steps_60", 1800, 0, 10000, defaultedBySM = true),
-    ApsBoostDynIsfAdjustmentFactor("boost_DynISFAdjust", 100, 1, 300),
     ApsBoostHrMaxBpm("boost_hr_max_bpm", 180, 150, 220, defaultedBySM = true),
     ApsBoostHrRestingBpm("boost_hr_resting_bpm", 60, 30, 100, defaultedBySM = true),
     ApsBoostHrWindowMinutes("boost_hr_window_minutes", 15, 5, 60, defaultedBySM = true),
