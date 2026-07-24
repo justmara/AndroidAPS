@@ -91,9 +91,13 @@ class DynIsfCalculatorImpl @Inject constructor(
             if (tdd == null) {
                 aapsLogger.error(LTag.APS, "Using TDD-based DynISF, but got no TDD")
                 return DynIsfResult(
-                    tdd1D = tdd1D, tdd7D = tdd7D,
-                    tddLast24H = tddLast24H, tddLast4H = tddLast4H, tddLast8to4H = tddLast8to4H,
-                    tdd = tdd, tddRaw = tddRaw,
+                    tdd1D = tdd1D,
+                    tdd7D = tdd7D,
+                    tddLast24H = tddLast24H,
+                    tddLast4H = tddLast4H,
+                    tddLast8to4H = tddLast8to4H,
+                    tdd = tdd,
+                    tddRaw = tddRaw,
                     insulinDivisor = insulinDivisor,
                     tddLast24HCarbs = tddLast24HCarbs,
                     tdd7DDataCarbs = tdd7DDataCarbs,
@@ -149,6 +153,10 @@ class DynIsfCalculatorImpl @Inject constructor(
             }
         }
 
+        // sensNormalTarget is the TDD-based sensitivity at normal target, after all adjustments
+        // except velocity scaling. Used externally by isfAtBg() for per-BG-level predictions.
+        val sensNormalTarget = baseSensitivity
+
         // Calculate variable sensitivity
         val velocity = preferences.get(IntKey.DynIsfVelocity) / 100.0
         val sbg = ln((glucose / insulinDivisor) + 1)
@@ -166,11 +174,29 @@ class DynIsfCalculatorImpl @Inject constructor(
             tddLast24H = tddLast24H, tddLast4H = tddLast4H, tddLast8to4H = tddLast8to4H,
             tdd = tdd, tddRaw = tddRaw,
             variableSensitivity = variableSensitivity,
+            sensNormalTarget = sensNormalTarget,
             insulinDivisor = insulinDivisor,
             tddLast24HCarbs = tddLast24HCarbs,
             tdd7DDataCarbs = tdd7DDataCarbs,
             tdd7DAllDaysHaveCarbs = tdd7DAllDaysHaveCarbs
         )
+    }
+
+    override fun isfAtBg(bg: Double, result: DynIsfResult, useCap: Boolean): Double {
+        val bgCapMgdl = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.DynIsfBgCap))
+        val velocity = preferences.get(IntKey.DynIsfVelocity) / 100.0
+        val normalTarget = 100.0
+        val divisor = result.insulinDivisor
+        val sensNormalTarget = result.sensNormalTarget
+
+        var bgAdj = bg
+        if (useCap && bgAdj > bgCapMgdl) {
+            bgAdj = bgCapMgdl + (bgAdj - bgCapMgdl) / 3.0
+        }
+
+        val sbg = ln((bgAdj / divisor) + 1)
+        val scaler = ln((normalTarget / divisor) + 1) / sbg
+        return (sensNormalTarget ?: return bg) * (1 - (1 - scaler) * velocity)
     }
 
     private fun capGlucose(glucoseStatus: GlucoseStatus): Double {

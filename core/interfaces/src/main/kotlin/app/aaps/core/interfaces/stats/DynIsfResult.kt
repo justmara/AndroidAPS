@@ -10,6 +10,8 @@ data class DynIsfResult(
     // raw weighted TDD before the DynISF adjustment factor — reused by Dynamic CR so it works whenever any TDD exists
     val tddRaw: Double? = null,
     val variableSensitivity: Double? = null,
+    // TDD-based sensitivity at normal target, after all adjustments except velocity scaling
+    val sensNormalTarget: Double? = null,
     val insulinDivisor: Int = 0,
     val tddLast24HCarbs: Double = 0.0,
     val tdd7DDataCarbs: Double = 0.0,
