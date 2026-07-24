@@ -182,12 +182,11 @@ class DynIsfCalculatorImpl @Inject constructor(
         )
     }
 
-    override fun isfAtBg(bg: Double, result: DynIsfResult, useCap: Boolean): Double {
+    override fun getIsfForBg(bg: Double, sensNormalTarget: Double, insulinDivisor: Int, useCap: Boolean): Double {
         val bgCapMgdl = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.DynIsfBgCap))
         val velocity = preferences.get(IntKey.DynIsfVelocity) / 100.0
         val normalTarget = 100.0
-        val divisor = result.insulinDivisor
-        val sensNormalTarget = result.sensNormalTarget
+        val divisor = insulinDivisor
 
         var bgAdj = bg
         if (useCap && bgAdj > bgCapMgdl) {
@@ -196,7 +195,7 @@ class DynIsfCalculatorImpl @Inject constructor(
 
         val sbg = ln((bgAdj / divisor) + 1)
         val scaler = ln((normalTarget / divisor) + 1) / sbg
-        return (sensNormalTarget ?: return bg) * (1 - (1 - scaler) * velocity)
+        return sensNormalTarget * (1 - (1 - scaler) * velocity)
     }
 
     private fun capGlucose(glucoseStatus: GlucoseStatus): Double {

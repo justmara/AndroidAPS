@@ -10,7 +10,6 @@ import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.aps.OapsProfileBoost
 import app.aaps.core.interfaces.aps.Predictions
 import app.aaps.core.interfaces.stats.DynIsfCalculator
-import app.aaps.core.interfaces.stats.DynIsfResult
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.profile.ProfileUtil
 import java.text.DecimalFormat
@@ -84,11 +83,7 @@ class DetermineBasalBoost @Inject constructor(
     // Delegates to the shared DynIsfCalculator for consistency with SMB/EN
     // =====================================================================
     fun getIsfByProfile(bg: Double, profile: OapsProfileBoost, useCap: Boolean): Double {
-        val result = DynIsfResult(
-            sensNormalTarget = profile.sensNormalTarget,
-            insulinDivisor = profile.insulinDivisor
-        )
-        return dynIsfCalculator.isfAtBg(bg, result, useCap)
+        return dynIsfCalculator.getIsfForBg(bg, profile.sensNormalTarget, profile.insulinDivisor, useCap)
     }
 
     // =====================================================================
