@@ -314,26 +314,62 @@ class MainApp : DaggerApplication() {
             sp.remove("ConfigBuilder_APS_OpenAPSSMBDynamicISFPlugin_Enabled")
             sp.remove("ConfigBuilder_APS_OpenAPSSMBDynamicISFPlugin_Visible")
             sp.putBoolean("ConfigBuilder_APS_OpenAPSSMB_Enabled", true)
-            preferences.put(BooleanKey.ApsUseDynamicSensitivity, true)
+            preferences.put(BooleanKey.DynIsfEnabled, true)
         }
-        // convert Double to Int
+        // DynISF settings migration (2026-07-24): old keys → unified DynIsf* keys.
+        // Priority: Boost old key → shared old key → new default.
         try {
-            val dynIsf = sp.getDouble("DynISFAdjust", 0.0)
-            if (dynIsf != 0.0 && dynIsf.toInt() != preferences.get(IntKey.ApsDynIsfAdjustmentFactor))
-                preferences.put(IntKey.ApsDynIsfAdjustmentFactor, dynIsf.toInt())
-        } catch (_: Exception) { /* ignore */
-        }
-        // The Boost DynISF adjustment factor used to share the "DynISFAdjust" SP entry with the
-        // SMB/AutoISF factor (IntKey collision: one overwrote the other). The Boost key was renamed to
-        // "boost_DynISFAdjust"; carry the previously-shared value into the new key once so existing
-        // Boost users keep their setting instead of silently reverting to the default.
-        try {
-            if (preferences.getIfExists(IntKey.ApsBoostDynIsfAdjustmentFactor) == null)
-                preferences.getIfExists(IntKey.ApsDynIsfAdjustmentFactor)?.let { shared ->
-                    preferences.put(IntKey.ApsBoostDynIsfAdjustmentFactor, shared.coerceIn(1, 300))
+            fun migrateBool(oldKey: String, newKey: BooleanKey) {
+                @Suppress("UNCHECKED_CAST")
+                preferences.getIfExists(oldKey)?.let { preferences.put(newKey, it as Boolean) }
+            }
+
+            fun migrateInt(oldKey: String, newKey: IntKey) {
+                preferences.getIfExists(oldKey)?.let { v ->
+                    preferences.put(newKey, (v as Int).coerceIn(newKey.min, newKey.max))
                 }
-        } catch (_: Exception) { /* ignore */
-        }
+            }
+
+            fun migrateUnitDouble(oldKey: String, newKey: UnitDoubleKey) {
+                preferences.getIfExists(oldKey)?.let { v ->
+                    val d = (v as Number).toDouble()
+                    preferences.put(newKey, d.coerceIn(newKey.minMgdl.toDouble(), newKey.maxMgdl.toDouble()))
+                }
+            }
+
+            // Phase 1: Boost old keys (take priority)
+            migrateBool("boost_use_tdd", BooleanKey.DynIsfUseTdd)
+            migrateBool("boost_adjust_sensitivity", BooleanKey.DynIsfAdjustSensitivity)
+            migrateBool("boost_autosens_when_no_tdd", BooleanKey.DynIsfAutosensWhenNoTdd)
+            migrateInt("boost_DynISFAdjust", IntKey.DynIsfAdjustmentFactor)
+            migrateUnitDouble("boost_dynisf_bg_cap", UnitDoubleKey.DynIsfBgCap)
+            migrateUnitDouble("boost_dynisf_normal_target", UnitDoubleKey.DynIsfNormalTarget)
+
+            // Phase 2: shared old keys (fallback — skip if the DynIsf key already has a value)
+            if (preferences.getIfExists(BooleanKey.DynIsfEnabled) == null)
+                migrateBool("use_dynamic_sensitivity", BooleanKey.DynIsfEnabled)
+            if (preferences.getIfExists(IntKey.DynIsfAdjustmentFactor) == null)
+                migrateInt("DynISFAdjust", IntKey.DynIsfAdjustmentFactor)
+            if (preferences.getIfExists(UnitDoubleKey.DynIsfBgCap) == null)
+                migrateUnitDouble("dynisf_bg_cap", UnitDoubleKey.DynIsfBgCap)
+
+            // DynIsfVelocity was stored as IntKey "DynISFVelocity" (old SMB) or as
+            // DoubleKey/IntKey "boost_dynisf_velocity" (old Boost, already migrated above).
+            if (preferences.getIfExists(IntKey.DynIsfVelocity) == null) {
+                preferences.getIfExists("DynISFVelocity")?.let { v ->
+                    preferences.put(IntKey.DynIsfVelocity, (v as Int).coerceIn(IntKey.DynIsfVelocity.min, IntKey.DynIsfVelocity.max))
+                }
+            }
+
+            // Clean up old keys
+            listOf(
+                "use_dynamic_sensitivity",
+                "boost_use_tdd", "boost_adjust_sensitivity", "boost_autosens_when_no_tdd",
+                "boost_DynISFAdjust", "boost_dynisf_velocity",
+                "boost_dynisf_bg_cap", "boost_dynisf_normal_target",
+                "DynISFAdjust", "DynISFVelocity", "dynisf_bg_cap"
+            ).forEach { sp.remove(it) }
+        } catch (_: Exception) { /* ignore */ }
         // Clear SmsOtpPassword if wrongly replaced
         if (preferences.get(StringKey.SmsOtpPassword).length > 10) preferences.put(StringKey.SmsOtpPassword, "")
 
