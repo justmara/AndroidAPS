@@ -46,8 +46,8 @@ enum class BooleanKey(
     BgSourceUploadToNs("dexcomg5_nsupload", true, defaultedBySM = true, hideParentScreenIfHidden = true),
     BgSourceCreateSensorChange("dexcom_lognssensorchange", true, defaultedBySM = true),
 
-    ApsUseDynamicSensitivity("use_dynamic_sensitivity", false),
-    ApsUseAutosens("openapsama_useautosens", true, defaultedBySM = true, negativeDependency = ApsUseDynamicSensitivity), // change from default false
+    DynIsfEnabled("dynisf_enabled", false),
+    ApsUseAutosens("openapsama_useautosens", true, defaultedBySM = true, negativeDependency = DynIsfEnabled), // change from default false
     ApsUseSmb("use_smb", true, defaultedBySM = true), // change from default false
     ApsUseSmbWithHighTt("enableSMB_with_high_temptarget", false, defaultedBySM = true, dependency = ApsUseSmb),
     ApsUseSmbAlways("enableSMB_always", true, defaultedBySM = true, dependency = ApsUseSmb), // change from default false
@@ -58,9 +58,9 @@ enum class BooleanKey(
     ApsSensitivityRaisesTarget("sensitivity_raises_target", true, defaultedBySM = true),
     ApsResistanceLowersTarget("resistance_lowers_target", true, defaultedBySM = true), // change from default false
     ApsAlwaysUseShortDeltas("always_use_shortavg", false, defaultedBySM = true, hideParentScreenIfHidden = true),
-    ApsDynIsfAdjustSensitivity("dynisf_adjust_sensitivity", false, defaultedBySM = true, dependency = ApsUseDynamicSensitivity), // change from default false
-    ApsDynIsfUseProfileSens("dynisf_use_profile_sens", false, defaultedBySM = false, dependency = ApsUseDynamicSensitivity),
-    ApsDynIsfProfilePercentage("dynisf_use_profile_percentage", true, defaultedBySM = true, dependency = ApsUseDynamicSensitivity, negativeDependency = ApsDynIsfUseProfileSens),
+    DynIsfAdjustSensitivity("dynisf_adjust_sensitivity", false, defaultedBySM = true, dependency = DynIsfEnabled), // change from default false
+    DynIsfUseProfileSens("dynisf_use_profile_sens", false, defaultedBySM = false, dependency = DynIsfEnabled),
+    DynIsfProfilePercentage("dynisf_use_profile_percentage", true, defaultedBySM = true, dependency = DynIsfEnabled, negativeDependency = DynIsfUseProfileSens),
     ApsUseDynamicCarbRatio("use_dynamic_carb_ratio", false),
     ApsDynamicCrUseCustomPeakTime("dynamic_cr_use_custom_peak_time", false, dependency = ApsUseDynamicCarbRatio),
     ApsAutoCr("auto_cr", false, negativeDependency = ApsUseDynamicCarbRatio),
@@ -169,8 +169,8 @@ enum class BooleanKey(
     ApsBoostEnablePercentScale("enableBoostPercentScale", false, defaultedBySM = true),
     ApsBoostEnableCircadianIsf("enableCircadianISF", false, defaultedBySM = true),
     ApsBoostAllowWithHighTt("enableBoost_with_high_temptarget", false, defaultedBySM = true),
-    ApsBoostUseTdd("boost_use_tdd", false, defaultedBySM = true),
-    ApsBoostAdjustSensitivity("boost_adjust_sensitivity", false, defaultedBySM = true),
+    DynIsfUseTdd("dynisf_use_tdd", false, defaultedBySM = true, dependency = DynIsfEnabled),
+    DynIsfAutosensWhenNoTdd("dynisf_autosens_when_no_tdd", false, defaultedBySM = true, dependency = DynIsfEnabled),
     ApsBoostAllowAllBgSources("boost_allow_all_bg_sources", true, defaultedBySM = true),
     ApsBoostNightModeEnabled("boost_night_mode_enabled", false, defaultedBySM = true),
     ApsBoostNightModeDisableWithCob("boost_night_mode_disable_with_cob", false, defaultedBySM = true),
@@ -188,5 +188,4 @@ enum class BooleanKey(
     ApsBoostV5FastCarbConfirm("boost_v5_fast_carb_confirm", true, defaultedBySM = true),
     ApsBoostV5AutoConfigDone("boost_v5_autoconfig_done", false, defaultedBySM = true),
     ApsBoostActivityShadowEnabled("boost_activity_shadow_enabled", true, defaultedBySM = true),
-    ApsBoostAutosensWhenNoTdd("boost_autosens_when_no_tdd", false, defaultedBySM = true),
 }
