@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.aps.OapsProfile
 import app.aaps.core.interfaces.aps.Predictions
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.profile.ProfileUtil
+import app.aaps.core.interfaces.stats.DynIsfCalculator
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import kotlinx.coroutines.Delay
 import java.text.DecimalFormat
@@ -31,7 +32,8 @@ import kotlin.math.roundToInt
 @Singleton
 class DetermineBasalEN @Inject constructor(
     private val profileUtil: ProfileUtil,
-    private val fabricPrivacy: FabricPrivacy
+    private val fabricPrivacy: FabricPrivacy,
+    private val dynIsfCalculator: DynIsfCalculator
 ) {
 
     private val consoleError = mutableListOf<String>()
@@ -629,17 +631,17 @@ class DetermineBasalEN @Inject constructor(
             //console.error(iobTick);
             val predBGI: Double = round((-iobTick.activity * sens * 5), 2)
             val IOBpredBGI: Double =
-                if (dynIsfMode) round((-iobTick.activity * (1800 / (profile.TDD * (ln((max(IOBpredBGs[IOBpredBGs.size - 1], 39.0) / profile.insulinDivisor) + 1)))) * 5), 2)
+                if (dynIsfMode) round((-iobTick.activity * dynIsfCalculator.getIsfForBg(max(IOBpredBGs[IOBpredBGs.size - 1], 39.0), profile.sensNormalTarget, profile.insulinDivisor, true) * 5), 2)
                 else predBGI
             iobTick.iobWithZeroTemp ?: error("iobTick.iobWithZeroTemp missing")
             // try to find where is crashing https://console.firebase.google.com/u/0/project/androidaps-c34f8/crashlytics/app/android:info.nightscout.androidaps/issues/950cdbaf63d545afe6d680281bb141e5?versions=3.3.0-dev-d%20(1500)&time=last-thirty-days&types=crash&sessionEventKey=673BF7DD032300013D4704707A053273_2017608123846397475
             if (iobTick.iobWithZeroTemp!!.activity.isNaN() || sens.isNaN())
                 fabricPrivacy.logCustom("iobTick.iobWithZeroTemp!!.activity=${iobTick.iobWithZeroTemp!!.activity} sens=$sens")
             val predZTBGI =
-                if (dynIsfMode) round((-iobTick.iobWithZeroTemp!!.activity * (1800 / (profile.TDD * (ln((max(ZTpredBGs[ZTpredBGs.size - 1], 39.0) / profile.insulinDivisor) + 1)))) * 5), 2)
+                if (dynIsfMode) round((-iobTick.iobWithZeroTemp!!.activity * dynIsfCalculator.getIsfForBg(max(ZTpredBGs[ZTpredBGs.size - 1], 39.0), profile.sensNormalTarget, profile.insulinDivisor, true) * 5), 2)
                 else round((-iobTick.iobWithZeroTemp!!.activity * sens * 5), 2)
             val predUAMBGI =
-                if (dynIsfMode) round((-iobTick.activity * (1800 / (profile.TDD * (ln((max(UAMpredBGs[UAMpredBGs.size - 1], 39.0) / profile.insulinDivisor) + 1)))) * 5), 2)
+                if (dynIsfMode) round((-iobTick.activity * dynIsfCalculator.getIsfForBg(max(UAMpredBGs[UAMpredBGs.size - 1], 39.0), profile.sensNormalTarget, profile.insulinDivisor, true) * 5), 2)
                 else predBGI
             // for IOBpredBGs, predicted deviation impact drops linearly from current deviation down to zero
             // over 60 minutes (data points every 5m)
@@ -814,18 +816,15 @@ class DetermineBasalEN @Inject constructor(
         val fSensBG = min(minPredBG, bg)
         if (dynIsfMode && !useISFscaler) {
             if (bg > target_bg && glucose_status.delta < 3 && glucose_status.delta > -3 && glucose_status.shortAvgDelta > -3 && glucose_status.shortAvgDelta < 3 && eventualBG > target_bg && eventualBG < bg) {
-                future_sens = (1800 / (ln((((fSensBG * 0.5) + (bg * 0.5)) / profile.insulinDivisor) + 1) * profile.TDD))
-                future_sens = round(future_sens, 1)
+                future_sens = round(dynIsfCalculator.getIsfForBg(((fSensBG * 0.5) + (bg * 0.5)), profile.sensNormalTarget, profile.insulinDivisor, false), 1)
                 consoleLog.add("Future state sensitivity is $future_sens based on eventual and current bg due to flat glucose level above target")
                 rT.reason.append("Dosing sensitivity: " + convert_bg(future_sens) + " using eventual BG;")
             } else if (glucose_status.delta > 0 && eventualBG > target_bg || eventualBG > bg) {
-                future_sens = (1800 / (ln((bg / profile.insulinDivisor) + 1) * profile.TDD))
-                future_sens = round(future_sens, 1)
+                future_sens = round(dynIsfCalculator.getIsfForBg(bg, profile.sensNormalTarget, profile.insulinDivisor, false), 1)
                 consoleLog.add("Future state sensitivity is $future_sens using current bg due to small delta or variation")
                 rT.reason.append("Dosing sensitivity: " + convert_bg(future_sens) + " using current BG;")
             } else {
-                future_sens = (1800 / (ln((fSensBG / profile.insulinDivisor) + 1) * profile.TDD))
-                future_sens = round(future_sens, 1)
+                future_sens = round(dynIsfCalculator.getIsfForBg(fSensBG, profile.sensNormalTarget, profile.insulinDivisor, false), 1)
                 consoleLog.add("Future state sensitivity is $future_sens based on eventual bg due to -ve delta")
                 rT.reason.append("Dosing sensitivity: " + convert_bg(future_sens) + " using eventual BG;")
             }

@@ -46,6 +46,7 @@ data class OapsProfile(
     var lgsThreshold: Int?,
     //DynISF only
     var variable_sens: Double,
+    var sensNormalTarget: Double = 0.0,
     var insulinDivisor: Int,
     var TDD: Double,
 

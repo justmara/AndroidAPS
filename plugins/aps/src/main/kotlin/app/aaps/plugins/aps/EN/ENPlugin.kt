@@ -550,6 +550,7 @@ open class ENPlugin @Inject constructor(
             autosens_max = preferences.get(DoubleKey.AutosensMax),
             out_units = if (profileFunction.getUnits() == GlucoseUnit.MMOL) "mmol/L" else "mg/dl",
             variable_sens = if (dynIsfMode) dynIsfResult.variableSensitivity ?: 0.0 else 0.0,
+            sensNormalTarget = dynIsfResult.sensNormalTarget ?: 0.0,
             insulinDivisor = dynIsfResult.insulinDivisor,
             TDD = dynIsfResult.tdd ?: 0.0,
             use_TDD_for_predictions = null // not used
