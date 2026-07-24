@@ -24,15 +24,14 @@ enum class UnitDoubleKey(
     OverviewLowMark("low_mark", 72.0, 25, 160, showInNsClientMode = false, hideParentScreenIfHidden = true),
     OverviewHighMark("high_mark", 180.0, 90, 250, showInNsClientMode = false),
 
-    ApsLgsThreshold("lgsThreshold", 65.0, 60, 100, defaultedBySM = true, dependency = BooleanKey.ApsUseDynamicSensitivity),
+    ApsLgsThreshold("lgsThreshold", 65.0, 60, 100, defaultedBySM = true, dependency = BooleanKey.DynIsfEnabled),
     ApsAutoIsfSmbDeliveryRatioBgRange("openapsama_smb_delivery_ratio_bg_range", 0.0, 0, 100, defaultedBySM = true),
 
-    ApsDynIsfBgCap("dynisf_bg_cap", 430.0, 108, 450, dependency = BooleanKey.ApsUseDynamicSensitivity),
+    DynIsfBgCap("dynisf_bg_cap", 210.0, 100, 300, dependency = BooleanKey.DynIsfEnabled),
+    DynIsfNormalTarget("dynisf_normal_target", 99.0, 70, 120, dependency = BooleanKey.DynIsfEnabled),
     SmbBgThreshold("smb_bg_threshold", 108.0, 80, 180, dependency = BooleanKey.EnableSmbBgThreshold),
 
     // Boost
-    ApsBoostDynIsfBgCap("boost_dynisf_bg_cap", 210.0, 100, 300, defaultedBySM = true),
-    ApsBoostDynIsfNormalTarget("boost_dynisf_normal_target", 99.0, 70, 120, defaultedBySM = true),
     ApsBoostNightModeBgOffset("boost_night_mode_bg_offset", 27.0, 0, 90, defaultedBySM = true),
     ApsBoostPostExerciseRecoveryTarget("boost_post_exercise_recovery_target", 144.0, 90, 200, defaultedBySM = true),
 
