@@ -149,7 +149,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
     @Volatile override var lastAPSRun: Long = 0
     override val algorithm = APSResult.Algorithm.SMB
     @Volatile override var lastAPSResult: APSResult? = null
-    override fun supportsDynamicIsf(): Boolean = preferences.get(BooleanKey.ApsUseDynamicSensitivity)
+    override fun supportsDynamicIsf(): Boolean = preferences.get(BooleanKey.DynIsfEnabled)
 
     override fun getIsfMgdl(profile: Profile, caller: String): Double? {
         val start = dateUtil.now()
@@ -209,8 +209,8 @@ open class OpenAPSSMBPlugin @Inject constructor(
         val smbAlwaysEnabled = preferences.get(BooleanKey.ApsUseSmbAlways)
         val uamEnabled = preferences.get(BooleanKey.ApsUseUam)
         val advancedFiltering = activePlugin.activeBgSource.advancedFilteringSupported() || preferences.get(BooleanKey.AlwaysPromoteAdvancedFiltering)
-        val autoSensOrDynIsfSensEnabled = if (preferences.get(BooleanKey.ApsUseDynamicSensitivity)) {
-            preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity)
+        val autoSensOrDynIsfSensEnabled = if (preferences.get(BooleanKey.DynIsfEnabled)) {
+            preferences.get(BooleanKey.DynIsfAdjustSensitivity)
         } else {
             preferences.get(BooleanKey.ApsUseAutosens)
         }
@@ -228,7 +228,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
     @Synchronized
     private fun calculateVariableIsf(timestamp: Long, profile: Profile): Pair<String, Double?> {
-        if (!preferences.get(BooleanKey.ApsUseDynamicSensitivity)) return Pair("OFF", null)
+        if (!preferences.get(BooleanKey.DynIsfEnabled)) return Pair("OFF", null)
 
         val result = persistenceLayer.getApsResultCloseTo(timestamp)
         if (result?.variableSens != null && result.variableSens != 0.0) {
@@ -247,7 +247,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         }
 
         val dynIsfResult = calculateRawDynIsf(profile)
-        if (!dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.ApsDynIsfUseProfileSens)) return Pair("TDD miss", null)
+        if (!dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseProfileSens)) return Pair("TDD miss", null)
         // no cached result found, let's calculate the value
         //aapsLogger.debug("calculateVariableIsf $caller CAL ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $sensitivity")
         dynIsfCache.put(key, dynIsfResult.variableSensitivity)
@@ -281,7 +281,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
     private fun capGlucose(glucoseStatus: GlucoseStatus): Double {
         // inspired by justmara
-        val bgCap = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.ApsDynIsfBgCap))
+        val bgCap = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.DynIsfBgCap))
         return if (glucoseStatus.glucose > bgCap)
             bgCap + ((glucoseStatus.glucose - bgCap) / 3)
         else
@@ -299,7 +299,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
     private fun calculateRawDynIsf(profile: Profile): DynIsfResult {
         val dynIsfResult = DynIsfResult()
-        val profileMultiplier = if (preferences.get(BooleanKey.ApsDynIsfProfilePercentage))
+        val profileMultiplier = if (preferences.get(BooleanKey.DynIsfProfilePercentage))
             100.0 / (profile as ProfileSealed.EPS).value.originalPercentage
         else
             1.0
@@ -326,7 +326,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         var baseSensitivity = profile.getProfileIsfMgdl()
 
         // Always calculate TDD, it's used not just in sensitivity calculation
-        val useTDD = !preferences.get(BooleanKey.ApsDynIsfUseProfileSens)
+        val useTDD = !preferences.get(BooleanKey.DynIsfUseProfileSens)
         if (dynIsfResult.tddPartsCalculated()) {
             val tddStatus = TddStatus(dynIsfResult.tdd1D!!, dynIsfResult.tdd7D!!, dynIsfResult.tddLast24H!!, dynIsfResult.tddLast4H!!, dynIsfResult.tddLast8to4H!!)
             val tddWeightedFromLast8H = ((1.4 * tddStatus.tddLast4H) + (0.6 * tddStatus.tddLast8to4H)) * 3
@@ -337,7 +337,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         }
 
         dynIsfResult.tddRaw = dynIsfResult.tdd // raw weighted TDD (pre adjustment factor) for Dynamic CR
-        val adjFactor = preferences.get(IntKey.ApsDynIsfAdjustmentFactor) / 100.0
+        val adjFactor = preferences.get(IntKey.DynIsfAdjustmentFactor) / 100.0
         if (dynIsfResult.tdd != null) dynIsfResult.tdd = dynIsfResult.tdd!! * adjFactor
 
         if (useTDD) {
@@ -348,7 +348,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
             aapsLogger.debug(LTag.APS, "Using TDD base sensitivity")
             baseSensitivity = Round.roundTo(1800.0 / (dynIsfResult.tdd!! * (ln((normalTarget / dynIsfResult.insulinDivisor) + 1))), 0.1)
-            if (preferences.get(BooleanKey.ApsDynIsfProfilePercentage)) {
+            if (preferences.get(BooleanKey.DynIsfProfilePercentage)) {
                 baseSensitivity *= profileMultiplier
                 aapsLogger.debug(LTag.APS, "Scaling TDD sensitivity by profile% - $profileMultiplier")
             }
@@ -386,7 +386,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         }
 
         // Calculate variable sensitivity
-        val velocity = preferences.get(IntKey.ApsDynIsfVelocity) / 100.0
+        val velocity = preferences.get(IntKey.DynIsfVelocity) / 100.0
         val sbg = ln((glucose / dynIsfResult.insulinDivisor) + 1)
         val scaler = ln((normalTarget / dynIsfResult.insulinDivisor) + 1) / sbg
         val ratio = 1 - (1 - scaler) * velocity
@@ -456,9 +456,9 @@ open class OpenAPSSMBPlugin @Inject constructor(
         // End of check, start gathering data
         val dynIsfResult = calculateRawDynIsf(profile)
         val dynIsfMode =
-            preferences.get(BooleanKey.ApsUseDynamicSensitivity) &&
-                hardLimits.checkHardLimits(preferences.get(IntKey.ApsDynIsfAdjustmentFactor).toDouble(), R.string.dyn_isf_adjust_title, IntKey.ApsDynIsfAdjustmentFactor.min.toDouble(), IntKey.ApsDynIsfAdjustmentFactor.max.toDouble()) &&
-                hardLimits.checkHardLimits(preferences.get(IntKey.ApsDynIsfVelocity).toDouble(), R.string.dynisf_velocity, IntKey.ApsDynIsfVelocity.min.toDouble(), IntKey.ApsDynIsfVelocity.max.toDouble()) &&
+            preferences.get(BooleanKey.DynIsfEnabled) &&
+                hardLimits.checkHardLimits(preferences.get(IntKey.DynIsfAdjustmentFactor).toDouble(), R.string.dyn_isf_adjust_title, IntKey.DynIsfAdjustmentFactor.min.toDouble(), IntKey.DynIsfAdjustmentFactor.max.toDouble()) &&
+                hardLimits.checkHardLimits(preferences.get(IntKey.DynIsfVelocity).toDouble(), R.string.dynisf_velocity, IntKey.DynIsfVelocity.min.toDouble(), IntKey.DynIsfVelocity.max.toDouble()) &&
                 hardLimits.checkHardLimits(dynIsfResult.variableSensitivity ?: 0.0, R.string.dynisf_settings_title, HardLimits.MIN_ISF, HardLimits.MAX_ISF)
         val smbEnabled = preferences.get(BooleanKey.ApsUseSmb)
         val advancedFiltering = constraintsChecker.isAdvancedFilteringEnabled().also { inputConstraints.copyReasons(it) }.value()
@@ -483,7 +483,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
         var autosensResult = AutosensResult()
 
-        if (dynIsfMode && !dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.ApsDynIsfUseProfileSens)) {
+        if (dynIsfMode && !dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseProfileSens)) {
             uiInteraction.addNotificationValidTo(
                 Notification.SMB_FALLBACK, dateUtil.now(),
                 rh.gs(R.string.fallback_smb_no_tdd), Notification.INFO, dateUtil.now() + T.mins(1).msecs()
@@ -504,12 +504,12 @@ open class OpenAPSSMBPlugin @Inject constructor(
             // Compare insulin consumption of last 24h with last 7 days average
             // Guard tdd7D > 0: tddPartsCalculated() only ensures non-null, so a 0.0 average (sparse/restored
             // history) would make the ratio Infinity/NaN and poison the autosens ratio. Fall back to 1.0.
-            val tddRatio = if (preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity) && (dynIsfResult.tdd7D ?: 0.0) > 0.0)
+            val tddRatio = if (preferences.get(BooleanKey.DynIsfAdjustSensitivity) && (dynIsfResult.tdd7D ?: 0.0) > 0.0)
                 dynIsfResult.tddLast24H!! / dynIsfResult.tdd7D!! else 1.0
             // Because consumed carbs affects total amount of insulin compensate final ratio by consumed carbs ratio
             // take only 60% (expecting 40% basal). We cannot use bolus/total because of SMBs
             val carbsRatio = if (
-                preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity) &&
+                preferences.get(BooleanKey.DynIsfAdjustSensitivity) &&
                 dynIsfResult.tddLast24HCarbs != 0.0 &&
                 dynIsfResult.tdd7DDataCarbs != 0.0 &&
                 dynIsfResult.tdd7DAllDaysHaveCarbs
@@ -632,7 +632,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
             variable_sens = if (dynIsfMode) dynIsfResult.variableSensitivity ?: 0.0 else 0.0,
             insulinDivisor = dynIsfResult.insulinDivisor,
             TDD = dynIsfResult.tdd ?: 0.0,
-            use_TDD_for_predictions = !preferences.get(BooleanKey.ApsDynIsfUseProfileSens),
+            use_TDD_for_predictions = !preferences.get(BooleanKey.DynIsfUseProfileSens),
             dynamicCarbRatio = dynamicCarbRatio,
             dynamicCarbRatioReason = dynamicCarbRatioReason
         )
@@ -648,7 +648,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         aapsLogger.debug(LTag.APS, "Meal data:          $mealData")
         aapsLogger.debug(LTag.APS, "MicroBolusAllowed:  $microBolusAllowed")
         aapsLogger.debug(LTag.APS, "flatBGsDetected:    $flatBGsDetected")
-        aapsLogger.debug(LTag.APS, "DynIsfNonTDD:       ${preferences.get(BooleanKey.ApsDynIsfUseProfileSens)}")
+        aapsLogger.debug(LTag.APS, "DynIsfNonTDD:       ${preferences.get(BooleanKey.DynIsfUseProfileSens)}")
         aapsLogger.debug(LTag.APS, "DynIsfMode:         $dynIsfMode")
 
         determineBasalSMB.determine_basal(
@@ -735,9 +735,9 @@ open class OpenAPSSMBPlugin @Inject constructor(
     }
 
     override fun isAutosensModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
-        if (preferences.get(BooleanKey.ApsUseDynamicSensitivity)) {
+        if (preferences.get(BooleanKey.DynIsfEnabled)) {
             // DynISF mode
-            if (!preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity))
+            if (!preferences.get(BooleanKey.DynIsfAdjustSensitivity))
                 value.set(false, rh.gs(R.string.autosens_disabled_in_preferences), this)
         } else {
             // SMB mode
@@ -749,17 +749,17 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
     override fun configuration(): JSONObject =
         JSONObject()
-            .put(BooleanKey.ApsUseDynamicSensitivity, preferences)
-            .put(IntKey.ApsDynIsfAdjustmentFactor, preferences)
-            .put(IntKey.ApsDynIsfVelocity, preferences)
-            .put(BooleanKey.ApsDynIsfUseProfileSens, preferences)
+            .put(BooleanKey.DynIsfEnabled, preferences)
+            .put(IntKey.DynIsfAdjustmentFactor, preferences)
+            .put(IntKey.DynIsfVelocity, preferences)
+            .put(BooleanKey.DynIsfUseProfileSens, preferences)
 
     override fun applyConfiguration(configuration: JSONObject) {
         configuration
-            .store(BooleanKey.ApsUseDynamicSensitivity, preferences)
-            .store(IntKey.ApsDynIsfAdjustmentFactor, preferences)
-            .store(IntKey.ApsDynIsfVelocity, preferences)
-            .store(BooleanKey.ApsDynIsfUseProfileSens, preferences)
+            .store(BooleanKey.DynIsfEnabled, preferences)
+            .store(IntKey.DynIsfAdjustmentFactor, preferences)
+            .store(IntKey.DynIsfVelocity, preferences)
+            .store(BooleanKey.DynIsfUseProfileSens, preferences)
     }
 
     override fun addPreferenceScreen(preferenceManager: PreferenceManager, parent: PreferenceScreen, context: Context, requiredKey: String?) {
@@ -775,14 +775,14 @@ open class OpenAPSSMBPlugin @Inject constructor(
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
                 key = "dynisf_settings"
                 title = rh.gs(R.string.dynisf_settings_title)
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseDynamicSensitivity, summary = R.string.use_dynamic_sensitivity_summary, title = R.string.use_dynamic_sensitivity_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsDynIsfAdjustmentFactor, dialogMessage = R.string.dyn_isf_adjust_summary, title = R.string.dyn_isf_adjust_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsDynIsfVelocity, dialogMessage = R.string.dynisf_velocity_summary, title = R.string.dynisf_velocity))
-                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsDynIsfBgCap, dialogMessage = R.string.dynisf_bg_cap_summary, title = R.string.dynisf_bg_cap))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfEnabled, summary = R.string.use_dynamic_sensitivity_summary, title = R.string.use_dynamic_sensitivity_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfAdjustmentFactor, dialogMessage = R.string.dyn_isf_adjust_summary, title = R.string.dyn_isf_adjust_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfVelocity, dialogMessage = R.string.dynisf_velocity_summary, title = R.string.dynisf_velocity))
+                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfBgCap, dialogMessage = R.string.dynisf_bg_cap_summary, title = R.string.dynisf_bg_cap))
                 addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsLgsThreshold, dialogMessage = R.string.lgs_threshold_summary, title = R.string.lgs_threshold_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsDynIsfAdjustSensitivity, summary = R.string.dynisf_adjust_sensitivity_summary, title = R.string.dynisf_adjust_sensitivity))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsDynIsfUseProfileSens, summary = R.string.dynisf_use_profile_sens_summary, title = R.string.dynisf_use_profile_sens))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsDynIsfProfilePercentage, title = R.string.dynisf_use_profile_percentage))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAdjustSensitivity, summary = R.string.dynisf_adjust_sensitivity_summary, title = R.string.dynisf_adjust_sensitivity))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseProfileSens, summary = R.string.dynisf_use_profile_sens_summary, title = R.string.dynisf_use_profile_sens))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfProfilePercentage, title = R.string.dynisf_use_profile_percentage))
             })
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
                 key = "openapssmb_dynamic_cr_settings"
