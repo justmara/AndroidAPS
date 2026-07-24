@@ -9,6 +9,8 @@ import app.aaps.core.interfaces.aps.IobTotal
 import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.aps.OapsProfileBoost
 import app.aaps.core.interfaces.aps.Predictions
+import app.aaps.core.interfaces.stats.DynIsfCalculator
+import app.aaps.core.interfaces.stats.DynIsfResult
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.profile.ProfileUtil
 import java.text.DecimalFormat
@@ -17,7 +19,6 @@ import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -25,7 +26,8 @@ import kotlin.math.roundToInt
 
 @Singleton
 class DetermineBasalBoost @Inject constructor(
-    private val profileUtil: ProfileUtil
+    private val profileUtil: ProfileUtil,
+    private val dynIsfCalculator: DynIsfCalculator
 ) {
 
     private val consoleError = mutableListOf<String>()
@@ -79,17 +81,14 @@ class DetermineBasalBoost @Inject constructor(
 
     // =====================================================================
     // Boost-specific: Dynamic ISF calculation per BG level
-    // Replaces the TDD-based ln formula with the Boost getIsfByProfile approach
+    // Delegates to the shared DynIsfCalculator for consistency with SMB/EN
     // =====================================================================
     fun getIsfByProfile(bg: Double, profile: OapsProfileBoost, useCap: Boolean): Double {
-        var bgAdj = bg
-        if (useCap) {
-            val cap = profile.dynISFBgCap
-            if (bgAdj > cap) bgAdj = cap + (bgAdj - cap) / 3.0
-        }
-        val sensBG = ln((bgAdj / profile.insulinDivisor) + 1)
-        val scaler = ln((profile.normalTarget / profile.insulinDivisor) + 1) / sensBG
-        return profile.sensNormalTarget * (1 - (1 - scaler) * profile.dynISFvelocity)
+        val result = DynIsfResult(
+            sensNormalTarget = profile.sensNormalTarget,
+            insulinDivisor = profile.insulinDivisor
+        )
+        return dynIsfCalculator.isfAtBg(bg, result, useCap)
     }
 
     // =====================================================================
