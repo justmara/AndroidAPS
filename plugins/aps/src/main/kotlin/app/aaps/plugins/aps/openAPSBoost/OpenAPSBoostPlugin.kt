@@ -203,9 +203,9 @@ open class OpenAPSBoostPlugin @Inject constructor(
     // ---- Boost-specific preference getters ----
 
     // Dynamic ISF
-    private val dynIsfNormalTarget; get() = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.ApsBoostDynIsfNormalTarget))
-    private val dynIsfVelocity; get() = preferences.get(DoubleKey.ApsBoostDynIsfVelocity) / 100.0
-    private val dynIsfBgCap; get() = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.ApsBoostDynIsfBgCap))
+    private val dynIsfNormalTarget; get() = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.DynIsfNormalTarget))
+    private val dynIsfVelocity; get() = preferences.get(IntKey.DynIsfVelocity) / 100.0
+    private val dynIsfBgCap; get() = profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.DynIsfBgCap))
 
     // Boost SMB
     private val boostBolus; get() = preferences.get(DoubleKey.ApsBoostBolus)
@@ -353,8 +353,8 @@ open class OpenAPSBoostPlugin @Inject constructor(
         val debug = StringBuilder()
 
         // TDD-based ISF calculation
-        val useTdd = preferences.get(BooleanKey.ApsBoostUseTdd)
-        val adjustSens = preferences.get(BooleanKey.ApsBoostAdjustSensitivity)
+        val useTdd = preferences.get(BooleanKey.DynIsfUseTdd)
+        val adjustSens = preferences.get(BooleanKey.DynIsfAdjustSensitivity)
 
         if (useTdd) {
             // Fetch all TDD components — use allowMissingDays=true so partial data still works
@@ -389,7 +389,7 @@ open class OpenAPSBoostPlugin @Inject constructor(
                 debug.append("\nBlended TDD=${Round.roundTo(tdd, 0.1)}")
 
                 // Adjustment factor from Boost DynISF preferences (default 100%)
-                val dynIsfAdjust = preferences.get(IntKey.ApsBoostDynIsfAdjustmentFactor).toDouble().coerceIn(1.0, 300.0)
+                val dynIsfAdjust = preferences.get(IntKey.DynIsfAdjustmentFactor).toDouble().coerceIn(1.0, 300.0)
                 tdd *= dynIsfAdjust / 100.0
                 debug.append("\nFinal TDD=${Round.roundTo(tdd, 0.1)} (adj factor ${dynIsfAdjust.toInt()}%)")
 
@@ -954,8 +954,8 @@ open class OpenAPSBoostPlugin @Inject constructor(
         //        basal only). Gated by ApsBoostAutosensWhenNoTdd — default OFF (legacy: the curve
         //        ratio scales basal) until validated on the oref-vs-curve shadow telemetry logged below.
         val orefAutosensRatio = autosensResult.ratio     // real oref autosens (1.0 when autosens disabled)
-        val useTdd = preferences.get(BooleanKey.ApsBoostUseTdd)
-        val autosensWhenNoTdd = preferences.get(BooleanKey.ApsBoostAutosensWhenNoTdd)
+        val useTdd = preferences.get(BooleanKey.DynIsfUseTdd)
+        val autosensWhenNoTdd = preferences.get(BooleanKey.DynIsfAutosensWhenNoTdd)
         autosensResult.ratio = selectSensitivityRatio(useTdd, autosensWhenNoTdd, isfResult.ratio, orefAutosensRatio)
 
         // 5. Adjust basal if profile switch from activity
@@ -1861,13 +1861,13 @@ open class OpenAPSBoostPlugin @Inject constructor(
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
                 key = "boost_dynisf_settings"
                 title = rh.gs(R.string.boost_dynisf_title)
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostUseTdd, summary = R.string.boost_use_tdd_summary, title = R.string.boost_use_tdd_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostAdjustSensitivity, summary = R.string.boost_adjust_sensitivity_summary, title = R.string.boost_adjust_sensitivity_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostAutosensWhenNoTdd, summary = R.string.boost_autosens_when_no_tdd_summary, title = R.string.boost_autosens_when_no_tdd_title))
-                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsBoostDynIsfNormalTarget, dialogMessage = R.string.boost_dynisf_normal_target_summary, title = R.string.boost_dynisf_normal_target_title))
-                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsBoostDynIsfVelocity, dialogMessage = R.string.boost_dynisf_velocity_summary, title = R.string.boost_dynisf_velocity_title))
-                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsBoostDynIsfBgCap, dialogMessage = R.string.boost_dynisf_bg_cap_summary, title = R.string.boost_dynisf_bg_cap_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsBoostDynIsfAdjustmentFactor, dialogMessage = R.string.boost_dynisf_adjust_factor_summary, title = R.string.boost_dynisf_adjust_factor_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseTdd, summary = R.string.boost_use_tdd_summary, title = R.string.boost_use_tdd_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAdjustSensitivity, summary = R.string.boost_adjust_sensitivity_summary, title = R.string.boost_adjust_sensitivity_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAutosensWhenNoTdd, summary = R.string.boost_autosens_when_no_tdd_summary, title = R.string.boost_autosens_when_no_tdd_title))
+                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfNormalTarget, dialogMessage = R.string.boost_dynisf_normal_target_summary, title = R.string.boost_dynisf_normal_target_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfVelocity, dialogMessage = R.string.boost_dynisf_velocity_summary, title = R.string.boost_dynisf_velocity_title))
+                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfBgCap, dialogMessage = R.string.boost_dynisf_bg_cap_summary, title = R.string.boost_dynisf_bg_cap_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfAdjustmentFactor, dialogMessage = R.string.boost_dynisf_adjust_factor_summary, title = R.string.boost_dynisf_adjust_factor_title))
                 // Dynamic / Auto Carb Ratio (ported from Boost V2) — applies to whichever Boost
                 // plugin is active (V1 or "Boost V6"), since both route dosing through this engine.
                 addPreference(preferenceManager.createPreferenceScreen(context).apply {
