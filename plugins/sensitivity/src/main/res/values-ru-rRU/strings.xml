@@ -20,4 +20,25 @@
     <string name="openapsama_min_5m_carb_impact_summary">Значение по умолчанию: 3.0 (AMA) или 8.0 (SMB). Эта настройка на усвоение углеводов за 5 мин. По умолчанию ожидается 3мг/дл/5мин. Влияет на скорость учета поглощения углеводов COB и усвоения в расчетах прогнозируемой гликемии, когда ГК падает быстрее или не растет так как ожидается.</string>
     <string name="absorption_cutoff_title">Максимальное время усваимости пищи [h]</string>
     <string name="absorption_cutoff_summary">Время, за которое любая еда считается усвоившейся. Оставшиеся углеводы не будут учтены.</string>
+
+    <string name="dynisf_settings_title">Настройки DynISF</string>
+    <string name="use_dynamic_sensitivity_title">Динамическая чувствительность</string>
+    <string name="use_dynamic_sensitivity_summary">Включить динамический расчёт ISF на основе TDD и ГК</string>
+    <string name="dynisf_use_tdd_title">Использовать TDD для DynISF</string>
+    <string name="dynisf_use_tdd_summary">Использовать общую суточную дозу для расчёта DynISF</string>
+    <string name="dynisf_autosens_when_no_tdd_title">Autosens без TDD</string>
+    <string name="dynisf_autosens_when_no_tdd_summary">Использовать oref1 autosens если данных TDD недостаточно</string>
+    <string name="dynisf_normal_target_title">Нормальный целевой ГК для DynISF</string>
+    <string name="dynisf_normal_target_summary">Уровень ГК, при котором ISF равен профильному значению</string>
+    <string name="dynisf_adjust_factor_title">Коэффициент коррекции DynISF</string>
+    <string name="dynisf_adjust_factor_summary">Множитель для TDD-ISF (100%% = без коррекции)</string>
+    <string name="dynisf_adjust_sensitivity">Корректировать чувствительность</string>
+    <string name="dynisf_adjust_sensitivity_summary">Корректировать TDD-ISF по соотношению 24H/7D</string>
+    <string name="dynisf_velocity">Скорость DynISF</string>
+    <string name="dynisf_velocity_summary">Как быстро ISF меняется с ГК (0-200%%, по умолч. 100)</string>
+    <string name="dynisf_bg_cap">Потолок ГК DynISF</string>
+    <string name="dynisf_bg_cap_summary">Уровень ГК, выше которого рост ISF замедляется</string>
+    <string name="dynisf_use_profile_sens">Использовать профильный ISF</string>
+    <string name="dynisf_use_profile_sens_summary">Использовать ISF из профиля вместо расчёта из TDD</string>
+    <string name="dynisf_use_profile_percentage">Использовать процент профиля</string>
 </resources>

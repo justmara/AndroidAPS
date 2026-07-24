@@ -249,6 +249,21 @@ class SensitivityOref1Plugin @Inject constructor(
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.AutosensMax, dialogMessage = R.string.openapsama_autosens_max_summary, title = R.string.openapsama_autosens_max))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.AutosensMin, dialogMessage = R.string.openapsama_autosens_min_summary, title = R.string.openapsama_autosens_min))
             })
+            // Dynamic ISF Settings
+            addPreference(preferenceManager.createPreferenceScreen(context).apply {
+                key = "dynisf_settings"
+                title = rh.gs(R.string.dynisf_settings_title)
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfEnabled, summary = R.string.use_dynamic_sensitivity_summary, title = R.string.use_dynamic_sensitivity_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseTdd, summary = R.string.dynisf_use_tdd_summary, title = R.string.dynisf_use_tdd_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAdjustSensitivity, summary = R.string.dynisf_adjust_sensitivity_summary, title = R.string.dynisf_adjust_sensitivity))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAutosensWhenNoTdd, summary = R.string.dynisf_autosens_when_no_tdd_summary, title = R.string.dynisf_autosens_when_no_tdd_title))
+                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfNormalTarget, dialogMessage = R.string.dynisf_normal_target_summary, title = R.string.dynisf_normal_target_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfVelocity, dialogMessage = R.string.dynisf_velocity_summary, title = R.string.dynisf_velocity))
+                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfBgCap, dialogMessage = R.string.dynisf_bg_cap_summary, title = R.string.dynisf_bg_cap))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfAdjustmentFactor, dialogMessage = R.string.dynisf_adjust_factor_summary, title = R.string.dynisf_adjust_factor_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseProfileSens, summary = R.string.dynisf_use_profile_sens_summary, title = R.string.dynisf_use_profile_sens))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfProfilePercentage, title = R.string.dynisf_use_profile_percentage))
+            })
         }
     }
 }

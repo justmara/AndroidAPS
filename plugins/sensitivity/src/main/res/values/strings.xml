@@ -23,4 +23,25 @@
     <string name="absorption_cutoff_title">Meal max absorption time [h]</string>
     <string name="absorption_cutoff_summary">Time at which any meal is considered absorbed. Remaining carbs will be cut off.</string>
 
+    <string name="dynisf_settings_title">Dynamic ISF Settings</string>
+    <string name="use_dynamic_sensitivity_title">Dynamic sensitivity</string>
+    <string name="use_dynamic_sensitivity_summary">Enable dynamic sensitivity (ISF) calculation based on TDD and BG</string>
+    <string name="dynisf_use_tdd_title">Use TDD for DynISF</string>
+    <string name="dynisf_use_tdd_summary">Use Total Daily Dose to anchor dynamic ISF calculation</string>
+    <string name="dynisf_autosens_when_no_tdd_title">Autosens when TDD unavailable</string>
+    <string name="dynisf_autosens_when_no_tdd_summary">Fall back to oref1 autosens when TDD data is insufficient</string>
+    <string name="dynisf_normal_target_title">DynISF normal target</string>
+    <string name="dynisf_normal_target_summary">BG level at which ISF equals the profile value</string>
+    <string name="dynisf_adjust_factor_title">DynISF adjustment factor</string>
+    <string name="dynisf_adjust_factor_summary">Scale factor for TDD-based ISF (100%% = no adjustment)</string>
+    <string name="dynisf_adjust_sensitivity">Adjust sensitivity</string>
+    <string name="dynisf_adjust_sensitivity_summary">Adjust TDD-based ISF by 24H/7D sensitivity ratio</string>
+    <string name="dynisf_velocity">DynISF velocity</string>
+    <string name="dynisf_velocity_summary">How quickly ISF adjusts with BG changes (0-200%%, default 100)</string>
+    <string name="dynisf_bg_cap">DynISF BG cap</string>
+    <string name="dynisf_bg_cap_summary">BG level above which ISF increase slows down</string>
+    <string name="dynisf_use_profile_sens">Use profile sensitivity</string>
+    <string name="dynisf_use_profile_sens_summary">Use profile ISF as baseline instead of TDD calculation</string>
+    <string name="dynisf_use_profile_percentage">Use profile percentage</string>
+
 </resources>
