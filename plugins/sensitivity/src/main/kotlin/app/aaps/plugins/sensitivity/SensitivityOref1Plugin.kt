@@ -222,6 +222,19 @@ class SensitivityOref1Plugin @Inject constructor(
             .put(DoubleKey.AbsorptionCutOff, preferences)
             .put(DoubleKey.AutosensMin, preferences)
             .put(DoubleKey.AutosensMax, preferences)
+            .put(BooleanKey.DynIsfEnabled, preferences)
+            .put(BooleanKey.DynIsfUseTdd, preferences)
+            .put(BooleanKey.DynIsfAdjustSensitivity, preferences)
+            .put(BooleanKey.DynIsfAutosensWhenNoTdd, preferences)
+            .put(UnitDoubleKey.DynIsfNormalTarget, preferences)
+            .put(IntKey.DynIsfVelocity, preferences)
+            .put(UnitDoubleKey.DynIsfBgCap, preferences)
+            .put(IntKey.DynIsfAdjustmentFactor, preferences)
+            .put(BooleanKey.DynIsfUseProfileSens, preferences)
+            .put(BooleanKey.DynIsfProfilePercentage, preferences)
+            .put(BooleanKey.ApsAutoIsfHighTtRaisesSens, preferences)
+            .put(BooleanKey.ApsAutoIsfLowTtLowersSens, preferences)
+            .put(IntKey.ApsAutoIsfHalfBasalExerciseTarget, preferences)
 
     override fun applyConfiguration(configuration: JSONObject) {
         configuration
@@ -229,6 +242,19 @@ class SensitivityOref1Plugin @Inject constructor(
             .store(DoubleKey.AbsorptionCutOff, preferences)
             .store(DoubleKey.AutosensMin, preferences)
             .store(DoubleKey.AutosensMax, preferences)
+            .store(BooleanKey.DynIsfEnabled, preferences)
+            .store(BooleanKey.DynIsfUseTdd, preferences)
+            .store(BooleanKey.DynIsfAdjustSensitivity, preferences)
+            .store(BooleanKey.DynIsfAutosensWhenNoTdd, preferences)
+            .store(UnitDoubleKey.DynIsfNormalTarget, preferences)
+            .store(IntKey.DynIsfVelocity, preferences)
+            .store(UnitDoubleKey.DynIsfBgCap, preferences)
+            .store(IntKey.DynIsfAdjustmentFactor, preferences)
+            .store(BooleanKey.DynIsfUseProfileSens, preferences)
+            .store(BooleanKey.DynIsfProfilePercentage, preferences)
+            .store(BooleanKey.ApsAutoIsfHighTtRaisesSens, preferences)
+            .store(BooleanKey.ApsAutoIsfLowTtLowersSens, preferences)
+            .store(IntKey.ApsAutoIsfHalfBasalExerciseTarget, preferences)
     }
 
     override val id: SensitivityType
@@ -269,6 +295,9 @@ class SensitivityOref1Plugin @Inject constructor(
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfAdjustmentFactor, dialogMessage = R.string.dynisf_adjust_factor_summary, title = R.string.dynisf_adjust_factor_title))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseProfileSens, summary = R.string.dynisf_use_profile_sens_summary, title = R.string.dynisf_use_profile_sens))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfProfilePercentage, title = R.string.dynisf_use_profile_percentage))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsAutoIsfHighTtRaisesSens, title = R.string.high_temptarget_raises_sensitivity_title))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsAutoIsfLowTtLowersSens, title = R.string.low_temptarget_lowers_sensitivity_title))
+                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsAutoIsfHalfBasalExerciseTarget, dialogMessage = R.string.half_basal_exercise_target_summary, title = R.string.half_basal_exercise_target_title))
             })
         }
     }
