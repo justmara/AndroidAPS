@@ -305,7 +305,6 @@ open class OpenAPSBoostV2Plugin @Inject constructor(
 
         // TDD-based ISF calculation (mandatory for V2 formula)
         val useTdd = preferences.get(BooleanKey.DynIsfUseTdd)
-        val adjustSens = preferences.get(BooleanKey.DynIsfAdjustSensitivity)
 
         if (useTdd) {
             // Fetch all TDD components — use allowMissingDays=true so partial data still works
@@ -352,20 +351,15 @@ open class OpenAPSBoostV2Plugin @Inject constructor(
                     debug.append("\nV2 ISF at target: ${Round.roundTo(sensNormalTarget, 0.1)} mg/dl/U (profile was ${Round.roundTo(profileSens, 0.1)})")
                     debug.append("\n  Formula: 2300/(ln(${Round.roundTo(bgNormalTarget, 0.0)}/$insulinDivisor+1)×${Round.roundTo(tdd, 0.1)}²×0.02)")
 
-                    if (adjustSens && tddLast24H > 0) {
-                        ratio = max(min(tddLast24H / tdd7D, autosensMax), autosensMin)
-                        // ISF shadow — V4.4.2-style EMA(τ=3h) ratio computed in parallel.
-                        isfShadowResult = boostIsfShadow.computeShadow(
-                            tddLast24H = tddLast24H,
-                            tdd7D = tdd7D,
-                            autosensMin = autosensMin,
-                            autosensMax = autosensMax
-                        )
-                        if (isfShadowResult != null) {
-                            debug.append("\n${isfShadowResult.debugLine}")
-                        }
-                        sensNormalTarget /= ratio
-                        debug.append("\nSens ratio: ${Round.roundTo(ratio, 0.01)} (24H/7D = ${Round.roundTo(tddLast24H, 0.1)}/${Round.roundTo(tdd7D, 0.1)}) → ISF=${Round.roundTo(sensNormalTarget, 0.1)}")
+                    // ISF shadow — V4.4.2-style EMA(τ=3h) ratio computed in parallel.
+                    isfShadowResult = boostIsfShadow.computeShadow(
+                        tddLast24H = tddLast24H,
+                        tdd7D = tdd7D,
+                        autosensMin = autosensMin,
+                        autosensMax = autosensMax
+                    )
+                    if (isfShadowResult != null) {
+                        debug.append("\n${isfShadowResult.debugLine}")
                     }
                 } else {
                     debug.append("\n⚠ TDD calculation produced invalid values (tdd=$tdd, logTerm=$logTerm) — using profile ISF")
@@ -396,10 +390,6 @@ open class OpenAPSBoostV2Plugin @Inject constructor(
         val sbg = ln((bgCurrent / insulinDivisor) + 1.0)
         val scaler = if (sbg > 0) ln((bgNormalTarget / insulinDivisor) + 1.0) / sbg else 1.0
         val variableSens = sensNormalTarget * scaler
-
-        if (ratio == 1.0 && adjustSens && !useTdd) {
-            ratio = sensNormalTarget / variableSens
-        }
 
         debug.append("\nVariable ISF at BG ${Round.roundTo(glucoseValue, 1.0)}: ${Round.roundTo(variableSens, 0.1)} (V2: full scale, no velocity)")
 

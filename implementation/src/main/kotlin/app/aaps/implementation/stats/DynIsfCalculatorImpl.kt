@@ -70,7 +70,7 @@ class DynIsfCalculatorImpl @Inject constructor(
         var baseSensitivity = profile.getProfileIsfMgdl()
 
         // Always calculate TDD, it's used not just in sensitivity calculation
-        val useTDD = !preferences.get(BooleanKey.DynIsfUseProfileSens)
+        val useTDD = preferences.get(BooleanKey.DynIsfUseTdd)
         var tdd: Double? = null
         val hasFullTDD = tdd1D != null && tdd7D != null && tddLast24H != null && tddLast4H != null && tddLast8to4H != null
         val hasQuickTDD = tddLast4H != null && tddLast8to4H != null
@@ -155,18 +155,38 @@ class DynIsfCalculatorImpl @Inject constructor(
 
         // sensNormalTarget is the TDD-based sensitivity at normal target, after all adjustments
         // except velocity scaling. Used externally by isfAtBg() for per-BG-level predictions.
+
+        // Calculate TDD-based autosens ratio (only when ISF is NOT from TDD to avoid double-count)
+        val adjustSens = !useTDD && preferences.get(BooleanKey.DynIsfAdjustSensitivity)
+        val tddRatio = if (adjustSens && hasFullTDD && (tdd7D ?: 0.0) > 0.0) {
+            val tr = tddLast24H!! / tdd7D!!
+            // carbs compensation: take only 60% (expecting 40% basal)
+            val cr = if (tddLast24HCarbs != 0.0 && tdd7DDataCarbs != 0.0 && tdd7DAllDaysHaveCarbs)
+                ((tddLast24HCarbs / tdd7DDataCarbs - 1.0) * 0.6) + 1.0
+            else 1.0
+            (tr / cr)
+                .coerceAtLeast(preferences.get(DoubleKey.AutosensMin))
+                .coerceAtMost(preferences.get(DoubleKey.AutosensMax))
+        } else 1.0
+
+        // Apply TDD ratio to base sensitivity (as autosens-like adjustment)
+        if (tddRatio != 1.0) {
+            baseSensitivity /= tddRatio
+            aapsLogger.debug(LTag.APS, "Applied TDD autosens ratio: $tddRatio → adjusted ISF=$baseSensitivity")
+        }
+
         val sensNormalTarget = baseSensitivity
 
         // Calculate variable sensitivity
         val velocity = preferences.get(IntKey.DynIsfVelocity) / 100.0
         val sbg = ln((glucose / insulinDivisor) + 1)
         val scaler = ln((normalTarget / insulinDivisor) + 1) / sbg
-        val ratio = 1 - (1 - scaler) * velocity
-        val variableSensitivity = baseSensitivity * ratio
+        val velocityRatio = 1 - (1 - scaler) * velocity
+        val variableSensitivity = baseSensitivity * velocityRatio
 
         aapsLogger.debug(
             LTag.APS,
-            "multiplier=$profileMultiplier gluc=$glucose tdd=$tdd (${adjFactor}x) baseSens=$baseSensitivity velocity=$velocity -> sensRatio=$ratio sens=$variableSensitivity"
+            "multiplier=$profileMultiplier gluc=$glucose tdd=$tdd (${adjFactor}x) baseSens=$baseSensitivity velocity=$velocity -> sensRatio=$velocityRatio sens=$variableSensitivity"
         )
 
         return DynIsfResult(
@@ -178,7 +198,8 @@ class DynIsfCalculatorImpl @Inject constructor(
             insulinDivisor = insulinDivisor,
             tddLast24HCarbs = tddLast24HCarbs,
             tdd7DDataCarbs = tdd7DDataCarbs,
-            tdd7DAllDaysHaveCarbs = tdd7DAllDaysHaveCarbs
+            tdd7DAllDaysHaveCarbs = tdd7DAllDaysHaveCarbs,
+            ratio = tddRatio
         )
     }
 

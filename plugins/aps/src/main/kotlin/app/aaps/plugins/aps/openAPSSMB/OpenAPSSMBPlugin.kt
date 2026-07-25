@@ -247,7 +247,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
         }
 
         val dynIsfResult = dynIsfCalculator.calculate(profile)
-        if (!dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseProfileSens)) return Pair("TDD miss", null)
+        if (!dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseTdd)) return Pair("TDD miss", null)
         // no cached result found, let's calculate the value
         //aapsLogger.debug("calculateVariableIsf $caller CAL ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $sensitivity")
         dynIsfCache.put(key, dynIsfResult.variableSensitivity)
@@ -342,7 +342,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
 
         var autosensResult = AutosensResult()
 
-        if (dynIsfMode && !dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseProfileSens)) {
+        if (dynIsfMode && !dynIsfResult.tddPartsCalculated() && !preferences.get(BooleanKey.DynIsfUseTdd)) {
             uiInteraction.addNotificationValidTo(
                 Notification.SMB_FALLBACK, dateUtil.now(),
                 rh.gs(R.string.fallback_smb_no_tdd), Notification.INFO, dateUtil.now() + T.mins(1).msecs()
@@ -360,23 +360,10 @@ open class OpenAPSSMBPlugin @Inject constructor(
         }
         if (dynIsfMode && dynIsfResult.tddPartsCalculated()) {
             uiInteraction.dismissNotification(Notification.SMB_FALLBACK)
-            // Compare insulin consumption of last 24h with last 7 days average
-            // Guard tdd7D > 0: tddPartsCalculated() only ensures non-null, so a 0.0 average (sparse/restored
-            // history) would make the ratio Infinity/NaN and poison the autosens ratio. Fall back to 1.0.
-            val tddRatio = if (preferences.get(BooleanKey.DynIsfAdjustSensitivity) && (dynIsfResult.tdd7D ?: 0.0) > 0.0)
-                dynIsfResult.tddLast24H!! / dynIsfResult.tdd7D!! else 1.0
-            // Because consumed carbs affects total amount of insulin compensate final ratio by consumed carbs ratio
-            // take only 60% (expecting 40% basal). We cannot use bolus/total because of SMBs
-            val carbsRatio = if (
-                preferences.get(BooleanKey.DynIsfAdjustSensitivity) &&
-                dynIsfResult.tddLast24HCarbs != 0.0 &&
-                dynIsfResult.tdd7DDataCarbs != 0.0 &&
-                dynIsfResult.tdd7DAllDaysHaveCarbs
-            ) ((dynIsfResult.tddLast24HCarbs / dynIsfResult.tdd7DDataCarbs - 1.0) * 0.6) + 1.0 else 1.0
             autosensResult = AutosensResult(
-                ratio = tddRatio / carbsRatio,
-                ratioFromTdd = tddRatio,
-                ratioFromCarbs = carbsRatio
+                ratio = dynIsfResult.ratio,
+                ratioFromTdd = dynIsfResult.ratio,
+                ratioFromCarbs = 1.0
             )
         } else {
             if (constraintsChecker.isAutosensModeEnabled().value()) {
@@ -492,7 +479,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
             sensNormalTarget = dynIsfResult.sensNormalTarget ?: 0.0,
             insulinDivisor = dynIsfResult.insulinDivisor,
             TDD = dynIsfResult.tdd ?: 0.0,
-            use_TDD_for_predictions = !preferences.get(BooleanKey.DynIsfUseProfileSens),
+            use_TDD_for_predictions = preferences.get(BooleanKey.DynIsfUseTdd),
             dynamicCarbRatio = dynamicCarbRatio,
             dynamicCarbRatioReason = dynamicCarbRatioReason
         )
@@ -508,7 +495,6 @@ open class OpenAPSSMBPlugin @Inject constructor(
         aapsLogger.debug(LTag.APS, "Meal data:          $mealData")
         aapsLogger.debug(LTag.APS, "MicroBolusAllowed:  $microBolusAllowed")
         aapsLogger.debug(LTag.APS, "flatBGsDetected:    $flatBGsDetected")
-        aapsLogger.debug(LTag.APS, "DynIsfNonTDD:       ${preferences.get(BooleanKey.DynIsfUseProfileSens)}")
         aapsLogger.debug(LTag.APS, "DynIsfMode:         $dynIsfMode")
 
         determineBasalSMB.determine_basal(
@@ -612,14 +598,14 @@ open class OpenAPSSMBPlugin @Inject constructor(
             .put(BooleanKey.DynIsfEnabled, preferences)
             .put(IntKey.DynIsfAdjustmentFactor, preferences)
             .put(IntKey.DynIsfVelocity, preferences)
-            .put(BooleanKey.DynIsfUseProfileSens, preferences)
+            .put(BooleanKey.DynIsfUseTdd, preferences)
 
     override fun applyConfiguration(configuration: JSONObject) {
         configuration
             .store(BooleanKey.DynIsfEnabled, preferences)
             .store(IntKey.DynIsfAdjustmentFactor, preferences)
             .store(IntKey.DynIsfVelocity, preferences)
-            .store(BooleanKey.DynIsfUseProfileSens, preferences)
+            .store(BooleanKey.DynIsfUseTdd, preferences)
     }
 
     override fun addPreferenceScreen(preferenceManager: PreferenceManager, parent: PreferenceScreen, context: Context, requiredKey: String?) {
@@ -641,7 +627,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
                 addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfBgCap, dialogMessage = R.string.dynisf_bg_cap_summary, title = R.string.dynisf_bg_cap))
                 addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.ApsLgsThreshold, dialogMessage = R.string.lgs_threshold_summary, title = R.string.lgs_threshold_title))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAdjustSensitivity, summary = R.string.dynisf_adjust_sensitivity_summary, title = R.string.dynisf_adjust_sensitivity))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseProfileSens, summary = R.string.dynisf_use_profile_sens_summary, title = R.string.dynisf_use_profile_sens))
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseTdd, summary = R.string.dynisf_use_tdd_summary, title = R.string.dynisf_use_tdd_title))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfProfilePercentage, title = R.string.dynisf_use_profile_percentage))
             })
             addPreference(preferenceManager.createPreferenceScreen(context).apply {

@@ -15,7 +15,8 @@ data class DynIsfResult(
     val insulinDivisor: Int = 0,
     val tddLast24HCarbs: Double = 0.0,
     val tdd7DDataCarbs: Double = 0.0,
-    val tdd7DAllDaysHaveCarbs: Boolean = false
+    val tdd7DAllDaysHaveCarbs: Boolean = false,
+    val ratio: Double = 1.0
 ) {
     fun tddPartsCalculated() = tdd1D != null && tdd7D != null && tddLast24H != null && tddLast4H != null && tddLast8to4H != null
     fun tddQuickCalculated() = tddLast4H != null && tddLast8to4H != null

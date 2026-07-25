@@ -151,7 +151,6 @@ open class ENPlugin @Inject constructor(
 
     override fun getIsfMgdl(profile: Profile, caller: String): Double? {
         val start = dateUtil.now()
-        val multiplier = (profile as ProfileSealed.EPS).value.originalPercentage / 100.0
         val sensitivity = calculateVariableIsf(start, profile)
         if (sensitivity.second == null)
             uiInteraction.addNotificationValidTo(
@@ -160,7 +159,7 @@ open class ENPlugin @Inject constructor(
             )
         else
             uiInteraction.dismissNotification(Notification.DYN_ISF_FALLBACK)
-        profiler.log(LTag.APS, "getIsfMgdl() multiplier=${multiplier} reason=${sensitivity.first} sensitivity=${sensitivity.second} caller=$caller", start)
+        profiler.log(LTag.APS, "getIsfMgdl() reason=${sensitivity.first} sensitivity=${sensitivity.second} caller=$caller", start)
         return sensitivity.second
     }
 
@@ -242,7 +241,7 @@ open class ENPlugin @Inject constructor(
         }
 
         val dynIsfResult = dynIsfCalculator.calculate(profile)
-        if (!dynIsfResult.tddPartsCalculated()) return Pair("TDD miss", null)
+        if (!dynIsfResult.tddPartsCalculated() && preferences.get(BooleanKey.DynIsfUseTdd)) return Pair("TDD miss", null)
         // no cached result found, let's calculate the value
         //aapsLogger.debug("calculateVariableIsf $caller CAL ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $sensitivity")
         dynIsfCache.put(key, dynIsfResult.variableSensitivity)
@@ -339,20 +338,10 @@ open class ENPlugin @Inject constructor(
         }
         if (dynIsfMode && dynIsfResult.tddPartsCalculated()) {
             uiInteraction.dismissNotification(Notification.SMB_FALLBACK)
-            // Compare insulin consumption of last 24h with last 7 days average
-            val tddRatio = if (preferences.get(BooleanKey.DynIsfAdjustSensitivity)) dynIsfResult.tddLast24H!! / dynIsfResult.tdd7D!! else 1.0
-            // Because consumed carbs affects total amount of insulin compensate final ratio by consumed carbs ratio
-            // take only 60% (expecting 40% basal). We cannot use bolus/total because of SMBs
-            val carbsRatio = if (
-                preferences.get(BooleanKey.DynIsfAdjustSensitivity) &&
-                dynIsfResult.tddLast24HCarbs != 0.0 &&
-                dynIsfResult.tdd7DDataCarbs != 0.0 &&
-                dynIsfResult.tdd7DAllDaysHaveCarbs
-            ) ((dynIsfResult.tddLast24HCarbs / dynIsfResult.tdd7DDataCarbs - 1.0) * 0.6) + 1.0 else 1.0
             autosensResult = AutosensResult(
-                ratio = tddRatio / carbsRatio,
-                ratioFromTdd = tddRatio,
-                ratioFromCarbs = carbsRatio
+                ratio = dynIsfResult.ratio,
+                ratioFromTdd = dynIsfResult.ratio,
+                ratioFromCarbs = 1.0
             )
         } else {
             if (constraintsChecker.isAutosensModeEnabled().value()) {
@@ -549,8 +538,8 @@ open class ENPlugin @Inject constructor(
             temptargetSet = isTempTarget,
             autosens_max = preferences.get(DoubleKey.AutosensMax),
             out_units = if (profileFunction.getUnits() == GlucoseUnit.MMOL) "mmol/L" else "mg/dl",
-            variable_sens = if (dynIsfMode) dynIsfResult.variableSensitivity ?: 0.0 else 0.0,
-            sensNormalTarget = dynIsfResult.sensNormalTarget ?: 0.0,
+            variable_sens = if (dynIsfMode) dynIsfResult.variableSensitivity ?: profileIsf else profileIsf,
+            sensNormalTarget = dynIsfResult.sensNormalTarget ?: profileIsf,
             insulinDivisor = dynIsfResult.insulinDivisor,
             TDD = dynIsfResult.tdd ?: 0.0,
             use_TDD_for_predictions = null // not used

@@ -58,9 +58,9 @@ enum class BooleanKey(
     ApsSensitivityRaisesTarget("sensitivity_raises_target", true, defaultedBySM = true),
     ApsResistanceLowersTarget("resistance_lowers_target", true, defaultedBySM = true), // change from default false
     ApsAlwaysUseShortDeltas("always_use_shortavg", false, defaultedBySM = true, hideParentScreenIfHidden = true),
-    DynIsfAdjustSensitivity("dynisf_adjust_sensitivity", false, defaultedBySM = true, dependency = DynIsfEnabled), // change from default false
-    DynIsfUseProfileSens("dynisf_use_profile_sens", false, defaultedBySM = false, dependency = DynIsfEnabled),
-    DynIsfProfilePercentage("dynisf_use_profile_percentage", true, defaultedBySM = true, dependency = DynIsfEnabled, negativeDependency = DynIsfUseProfileSens),
+    DynIsfUseTdd("dynisf_use_tdd", false, defaultedBySM = true, dependency = DynIsfEnabled),
+    DynIsfAdjustSensitivity("dynisf_adjust_sensitivity", false, defaultedBySM = true, dependency = DynIsfEnabled, negativeDependency = DynIsfUseTdd),
+    DynIsfProfilePercentage("dynisf_use_profile_percentage", true, defaultedBySM = true, dependency = DynIsfUseTdd),
     ApsUseDynamicCarbRatio("use_dynamic_carb_ratio", false),
     ApsDynamicCrUseCustomPeakTime("dynamic_cr_use_custom_peak_time", false, dependency = ApsUseDynamicCarbRatio),
     ApsAutoCr("auto_cr", false, negativeDependency = ApsUseDynamicCarbRatio),
@@ -169,7 +169,6 @@ enum class BooleanKey(
     ApsBoostEnablePercentScale("enableBoostPercentScale", false, defaultedBySM = true),
     ApsBoostEnableCircadianIsf("enableCircadianISF", false, defaultedBySM = true),
     ApsBoostAllowWithHighTt("enableBoost_with_high_temptarget", false, defaultedBySM = true),
-    DynIsfUseTdd("dynisf_use_tdd", false, defaultedBySM = true, dependency = DynIsfEnabled),
     DynIsfAutosensWhenNoTdd("dynisf_autosens_when_no_tdd", false, defaultedBySM = true, dependency = DynIsfEnabled),
     ApsBoostAllowAllBgSources("boost_allow_all_bg_sources", true, defaultedBySM = true),
     ApsBoostNightModeEnabled("boost_night_mode_enabled", false, defaultedBySM = true),

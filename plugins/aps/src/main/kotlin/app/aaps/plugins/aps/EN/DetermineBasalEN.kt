@@ -560,13 +560,13 @@ class DetermineBasalEN @Inject constructor(
 
         // calculate the number of carbs absorbed over remainingCATime hours at current CI
         // CI (mg/dL/5m) * (5m)/5 (m) * 60 (min/hr) * 4 (h) / 2 (linear decay factor) = total carb impact (mg/dL)
-        val totalCI = Math.max(0.0, ci / 5 * 60 * remainingCATime / 2)
+        val totalCI = max(0.0, ci / 5 * 60 * remainingCATime / 2)
         // totalCI (mg/dL) / CSF (mg/dL/g) = total carbs absorbed (g)
         val totalCA = totalCI / csf
         val remainingCarbsCap: Int // default to 90
         remainingCarbsCap = min(90, profile.remainingCarbsCap)
         var remainingCarbs = max(0.0, activeCOB - totalCA)
-        remainingCarbs = Math.min(remainingCarbsCap.toDouble(), remainingCarbs)
+        remainingCarbs = min(remainingCarbsCap.toDouble(), remainingCarbs)
         // assume remainingCarbs will absorb in a /\ shaped bilinear curve
         // peaking at remainingCATime / 2 and ending at remainingCATime hours
         // area of the /\ triangle is the same as a remainingCIpeak-height rectangle out to remainingCATime/2
@@ -812,7 +812,7 @@ class DetermineBasalEN @Inject constructor(
         val safetyStar = if (isAuthorisedMealRise && minPredBG > minIOBPredBG) "*" else ""
 
         // Dynamic ISF
-        var future_sens = profile.sens // start with profile ISF
+        var future_sens = profile.variable_sens // start with profile ISF
         val fSensBG = min(minPredBG, bg)
         if (dynIsfMode && !useISFscaler) {
             if (bg > target_bg && glucose_status.delta < 3 && glucose_status.delta > -3 && glucose_status.shortAvgDelta > -3 && glucose_status.shortAvgDelta < 3 && eventualBG > target_bg && eventualBG < bg) {

@@ -11,8 +11,8 @@ import dagger.android.ContributesAndroidInjector
 @Suppress("unused")
 abstract class ActivitiesModule {
 
-    @ContributesAndroidInjector abstract fun contributesHistoryBrowseActivity(): HistoryBrowseActivity
     @ContributesAndroidInjector abstract fun contributesMainActivity(): MainActivity
     @ContributesAndroidInjector abstract fun contributesPreferencesActivity(): PreferencesActivity
     @ContributesAndroidInjector abstract fun contributesPreferencesFragment(): MyPreferenceFragment
+    @ContributesAndroidInjector abstract fun contributesHistoryBrowseActivity(): HistoryBrowseActivity
 }

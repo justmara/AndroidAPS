@@ -61,7 +61,7 @@ enum class IntKey(
     MaintenanceCleanupDays("maintenance_cleanup_days", 93, 7, 93, defaultedBySM = true),
     ActivityMonitorIdleStart("inactivity_idle_start", 22, 0, 23, defaultedBySM = true, dependency = BooleanKey.ActivityMonitorOvernight),
     ActivityMonitorIdleEnd("inactivity_idle_end", 6, 0, 23, defaultedBySM = true, dependency = BooleanKey.ActivityMonitorOvernight),
-    DynIsfAdjustmentFactor("dynisf_adjustment_factor", 100, 1, 300, dependency = BooleanKey.DynIsfEnabled, negativeDependency = BooleanKey.DynIsfUseProfileSens),
+    DynIsfAdjustmentFactor("dynisf_adjustment_factor", 100, 1, 300, dependency = BooleanKey.DynIsfUseTdd),
     DynIsfVelocity("dynisf_velocity", 100, 0, 200, dependency = BooleanKey.DynIsfEnabled),
     ApsDynamicCrFormula("dynamic_cr_formula", 0, 0, 1, dependency = BooleanKey.ApsUseDynamicCarbRatio),
     // Capped below 120: at 120 the logarithmic insulinFactor (120 - peak) collapses and inflates the ratio.

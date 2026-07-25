@@ -49,6 +49,7 @@ import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
 import app.aaps.core.interfaces.rx.events.EventCalibrationDetected
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
+import app.aaps.core.interfaces.stats.DynIsfCalculator
 import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
@@ -117,6 +118,7 @@ open class OpenAPSBoostPlugin @Inject constructor(
     private val bgQualityCheck: BgQualityCheck,
     private val uiInteraction: UiInteraction,
     private val tddCalculator: TddCalculator,
+    private val dynIsfCalculator: DynIsfCalculator,
     private val dynamicCarbRatioCalculator: DynamicCarbRatioCalculator,
     private val determineBasalBoost: DetermineBasalBoost,
     // Layer A ML retrofit — both models are @Singleton, lazy-loaded from APK
@@ -330,7 +332,8 @@ open class OpenAPSBoostPlugin @Inject constructor(
         targetBg: Double,
         insulinDivisor: Int,
         glucoseValue: Double,
-        isTempTarget: Boolean
+        isTempTarget: Boolean,
+        profile: Profile
     ): BoostIsfResult {
         val autosensMax = preferences.get(DoubleKey.AutosensMax)
         val autosensMin = preferences.get(DoubleKey.AutosensMin)
@@ -356,75 +359,55 @@ open class OpenAPSBoostPlugin @Inject constructor(
         val useTdd = preferences.get(BooleanKey.DynIsfUseTdd)
         val adjustSens = preferences.get(BooleanKey.DynIsfAdjustSensitivity)
 
-        if (useTdd) {
-            // Fetch all TDD components — use allowMissingDays=true so partial data still works
-            val tdd7D = tddCalculator.averageTDD(tddCalculator.calculate(7, allowMissingDays = true))?.data?.totalAmount
-            val tdd1D = tddCalculator.averageTDD(tddCalculator.calculate(1, allowMissingDays = true))?.data?.totalAmount
-            val tddLast24H = tddCalculator.calculateDaily(-24, 0)?.totalAmount
-            val tddLast4H = tddCalculator.calculateDaily(-4, 0)?.totalAmount
-            val tddLast8to4H = tddCalculator.calculateDaily(-8, -4)?.totalAmount
+        if (useTdd || adjustSens) {
+            val result = dynIsfCalculator.calculate(profile)
+            val tdd7D = result.tdd7D
+            val tddLast24H = result.tddLast24H
 
             debug.append("TDD data: 7D=${tdd7D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 1D=${tdd1D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+            debug.append(" | 1D=${result.tdd1D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
             debug.append(" | 24H=${tddLast24H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 4H=${tddLast4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 8-4H=${tddLast8to4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+            debug.append(" | 4H=${result.tddLast4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+            debug.append(" | 8-4H=${result.tddLast8to4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
 
-            // Require ALL critical components — same safety gate as standard DynISF
-            if (tdd7D != null && tdd1D != null && tddLast24H != null && tddLast4H != null && tddLast8to4H != null && tdd7D > 0) {
-                val tddWeightedFromLast8H = ((1.4 * tddLast4H) + (0.6 * tddLast8to4H)) * 3
-                debug.append("\nWeighted8H=${Round.roundTo(tddWeightedFromLast8H, 0.1)} (4H×1.4 + 8-4H×0.6)×3")
+            // Log if TDD parts are incomplete — signals fallback to profile ISF
+            if (!result.tddPartsCalculated()) {
+                aapsLogger.debug(LTag.APS, "Boost: TDD parts missing (7D=$tdd7D 1D=${result.tdd1D} 24H=$tddLast24H 4H=${result.tddLast4H} 8-4H=${result.tddLast8to4H})")
+            }
 
-                if (tddWeightedFromLast8H < (0.75 * tdd7D)) {
-                    // Recent insulin usage significantly below 7D average —
-                    // pull the 7D average down toward recent reality before blending
-                    val adjusted7D = tddWeightedFromLast8H + ((tddWeightedFromLast8H / tdd7D) * (tdd7D - tddWeightedFromLast8H))
-                    tdd = (adjusted7D * 0.34) + (tdd1D * 0.33) + (tddWeightedFromLast8H * 0.33)
-                    debug.append("\nW8H < 75% of 7D → adjusted7D=${Round.roundTo(adjusted7D, 0.1)} (7D ${Round.roundTo(tdd7D, 0.1)} pulled toward W8H)")
+            result.sensNormalTarget?.let { target ->
+                if (!target.isFinite()) {
+                    debug.append("\n⚠ TDD ISF: invalid value ${Round.roundTo(target, 0.1)} — using profile ISF")
+                    aapsLogger.warn(LTag.APS, "Boost TDD ISF: invalid tdd=${result.tdd} (tddPartsCalculated=${result.tddPartsCalculated()}), falling back to profile ISF")
                 } else {
-                    // Standard blend
-                    tdd = (tddWeightedFromLast8H * 0.33) + (tdd7D * 0.34) + (tdd1D * 0.33)
-                    debug.append("\nStandard blend (W8H×.33 + 7D×.34 + 1D×.33)")
-                }
-                debug.append("\nBlended TDD=${Round.roundTo(tdd, 0.1)}")
-
-                // Adjustment factor from Boost DynISF preferences (default 100%)
-                val dynIsfAdjust = preferences.get(IntKey.DynIsfAdjustmentFactor).toDouble().coerceIn(1.0, 300.0)
-                tdd *= dynIsfAdjust / 100.0
-                debug.append("\nFinal TDD=${Round.roundTo(tdd, 0.1)} (adj factor ${dynIsfAdjust.toInt()}%)")
-
-                // Safety: TDD must be positive and produce a sane ISF
-                val logTerm = ln((bgNormalTarget / insulinDivisor) + 1.0)
-                if (tdd > 0 && logTerm > 0) {
-                    sensNormalTarget = 1800.0 / (tdd * logTerm)
-                    sensNormalTarget *= globalScale
+                    sensNormalTarget = target
+                    tdd = result.tdd ?: 0.0
                     debug.append("\nTDD ISF at target: ${Round.roundTo(sensNormalTarget, 0.1)} mg/dl/U (profile was ${Round.roundTo(profileSens, 0.1)})")
-
-                    if (adjustSens && tddLast24H > 0) {
-                        ratio = max(min(tddLast24H / tdd7D, autosensMax), autosensMin)
-                        sensNormalTarget /= ratio
-                        debug.append("\nSens ratio: ${Round.roundTo(ratio, 0.01)} (24H/7D = ${Round.roundTo(tddLast24H, 0.1)}/${Round.roundTo(tdd7D, 0.1)}) → ISF=${Round.roundTo(sensNormalTarget, 0.1)}")
-                    }
-
-                    // ISF shadow — compute the V4.4.2-style EMA(τ=3h) sensitivity ratio
-                    // in parallel. Does not modify sensNormalTarget; result is returned
-                    // alongside the real BoostIsfResult for direct comparison.
-                    isfShadowResult = boostIsfShadow.computeShadow(
-                        tddLast24H = tddLast24H,
-                        tdd7D = tdd7D,
-                        autosensMin = autosensMin,
-                        autosensMax = autosensMax
-                    )
-                    if (isfShadowResult != null) {
-                        debug.append("\n${isfShadowResult.debugLine}")
-                    }
-                } else {
-                    debug.append("\n⚠ TDD calculation produced invalid values (tdd=$tdd, logTerm=$logTerm) — using profile ISF")
-                    aapsLogger.warn(LTag.APS, "Boost TDD ISF: invalid tdd=$tdd or logTerm=$logTerm, falling back to profile ISF")
                 }
-            } else {
-                debug.append("\n⚠ TDD data incomplete — using profile ISF")
-                aapsLogger.debug(LTag.APS, "Boost: TDD parts missing (7D=$tdd7D 1D=$tdd1D 24H=$tddLast24H 4H=$tddLast4H 8-4H=$tddLast8to4H)")
+            } ?: run {
+                debug.append("\n⚠ DynISF calculation produced no result — using profile ISF")
+            }
+
+            // Apply TDD autosens ratio (only when !useTdd, DynIsfCalculator handles the logic)
+            if (result.ratio != 1.0) {
+                ratio = result.ratio
+                // sensNormalTarget already includes ratio adjustment from DynIsfCalculator
+                debug.append("\nTDD autosens ratio: ${Round.roundTo(ratio, 0.01)} → ISF=${Round.roundTo(sensNormalTarget, 0.1)}")
+            }
+
+            // ISF shadow — compute the V4.4.2-style EMA(τ=3h) sensitivity ratio
+            // in parallel. Does not modify sensNormalTarget; result is returned
+            // alongside the real BoostIsfResult for direct comparison.
+            if (useTdd && tdd7D != null && tddLast24H != null) {
+                isfShadowResult = boostIsfShadow.computeShadow(
+                    tddLast24H = tddLast24H,
+                    tdd7D = tdd7D,
+                    autosensMin = autosensMin,
+                    autosensMax = autosensMax
+                )
+                if (isfShadowResult != null) {
+                    debug.append("\n${isfShadowResult.debugLine}")
+                }
             }
         } else {
             debug.append("TDD-based ISF: disabled (using profile ISF ${Round.roundTo(profileSens, 0.1)})")
@@ -446,10 +429,6 @@ open class OpenAPSBoostPlugin @Inject constructor(
         val sbg = ln((bgCurrent / insulinDivisor) + 1.0)
         val scaler = ln((bgNormalTarget / insulinDivisor) + 1.0) / sbg
         val variableSens = sensNormalTarget * (1 - (1 - scaler) * velocity)
-
-        if (ratio == 1.0 && adjustSens && !useTdd) {
-            ratio = sensNormalTarget / variableSens
-        }
 
         debug.append("\nVariable ISF at BG ${Round.roundTo(glucoseValue, 1.0)}: ${Round.roundTo(variableSens, 0.1)} (velocity=${Round.roundTo(velocity * 100, 1.0)}%)")
 
@@ -936,7 +915,8 @@ open class OpenAPSBoostPlugin @Inject constructor(
             targetBg = targetBg,
             insulinDivisor = insulinDivisor,
             glucoseValue = glucoseStatus.glucose,
-            isTempTarget = isTempTarget
+            isTempTarget = isTempTarget,
+            profile = profile
         )
 
         // 4. Sensitivity ratio that drives basal / target / CR scaling in determine_basal.

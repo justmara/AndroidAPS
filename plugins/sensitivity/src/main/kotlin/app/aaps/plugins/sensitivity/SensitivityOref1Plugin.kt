@@ -230,7 +230,6 @@ class SensitivityOref1Plugin @Inject constructor(
             .put(IntKey.DynIsfVelocity, preferences)
             .put(UnitDoubleKey.DynIsfBgCap, preferences)
             .put(IntKey.DynIsfAdjustmentFactor, preferences)
-            .put(BooleanKey.DynIsfUseProfileSens, preferences)
             .put(BooleanKey.DynIsfProfilePercentage, preferences)
             .put(BooleanKey.ApsAutoIsfHighTtRaisesSens, preferences)
             .put(BooleanKey.ApsAutoIsfLowTtLowersSens, preferences)
@@ -250,7 +249,6 @@ class SensitivityOref1Plugin @Inject constructor(
             .store(IntKey.DynIsfVelocity, preferences)
             .store(UnitDoubleKey.DynIsfBgCap, preferences)
             .store(IntKey.DynIsfAdjustmentFactor, preferences)
-            .store(BooleanKey.DynIsfUseProfileSens, preferences)
             .store(BooleanKey.DynIsfProfilePercentage, preferences)
             .store(BooleanKey.ApsAutoIsfHighTtRaisesSens, preferences)
             .store(BooleanKey.ApsAutoIsfLowTtLowersSens, preferences)
@@ -266,7 +264,7 @@ class SensitivityOref1Plugin @Inject constructor(
     }
 
     override fun addPreferenceScreen(preferenceManager: PreferenceManager, parent: PreferenceScreen, context: Context, requiredKey: String?) {
-        if (requiredKey != null && requiredKey != "absorption_oref1_advanced") return
+        if (requiredKey != null && requiredKey !in arrayOf("absorption_oref1_advanced", "dynisf_settings")) return
         val category = PreferenceCategory(context)
         parent.addPreference(category)
         category.apply {
@@ -293,7 +291,6 @@ class SensitivityOref1Plugin @Inject constructor(
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfVelocity, dialogMessage = R.string.dynisf_velocity_summary, title = R.string.dynisf_velocity))
                 addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfBgCap, dialogMessage = R.string.dynisf_bg_cap_summary, title = R.string.dynisf_bg_cap))
                 addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfAdjustmentFactor, dialogMessage = R.string.dynisf_adjust_factor_summary, title = R.string.dynisf_adjust_factor_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseProfileSens, summary = R.string.dynisf_use_profile_sens_summary, title = R.string.dynisf_use_profile_sens))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfProfilePercentage, title = R.string.dynisf_use_profile_percentage))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsAutoIsfHighTtRaisesSens, title = R.string.high_temptarget_raises_sensitivity_title))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsAutoIsfLowTtLowersSens, title = R.string.low_temptarget_lowers_sensitivity_title))

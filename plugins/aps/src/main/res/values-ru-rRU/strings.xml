@@ -2,8 +2,8 @@
 <resources>
     <!--Autotune-->
     <string name="dynisf_use_profile_percentage">Использовать процент профиля</string>
-    <string name="dynisf_use_profile_sens">Базироваться на ISF профиля</string>
-    <string name="dynisf_use_profile_sens_summary">Рассчитывать Dynamic ISF на базе ISF профиля, не основываясь на TDD.</string>
+    <string name="dynisf_use_tdd_title">Использовать TDD для DynISF</string>
+    <string name="dynisf_use_tdd_summary">Использовать общую суточную дозу для расчёта DynISF</string>
     <string name="dynisf_bg_cap">Верхняя граница ГК для DynISF</string>
     <string name="dynisf_bg_cap_summary">Когда ГК выше заданного значения, передаваемое DynISF значение ГК будет меньше, чем реальное, что приведет к замедлению роста силы ФЧИ.</string>
     <string name="dynisf_adjust_sensitivity">Включить коэффициент чувствительности на основе суточной дозировки инсулина TDD для изменения базальной скорости и целевых значений гликемии</string>

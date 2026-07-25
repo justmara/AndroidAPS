@@ -5,8 +5,8 @@
     <string name="key_autotune_last_run" translatable="false">key_autotune_last_run</string>
 
     <string name="dynisf_use_profile_percentage">Use profile percentage</string>
-    <string name="dynisf_use_profile_sens">Depend on profile sensitivity</string>
-    <string name="dynisf_use_profile_sens_summary">Calculate Dynamic ISF based on profile sensitivity, not TDD-based sensitivity</string>
+    <string name="dynisf_use_tdd_title">Use TDD for DynISF</string>
+    <string name="dynisf_use_tdd_summary">Use Total Daily Dose to anchor dynamic ISF calculation</string>
     <string name="dynisf_bg_cap">DynamicISF BG cap</string>
     <string name="dynisf_bg_cap_summary">When BG is above this value, the BG provided to DynamicISF would start to be lowered down, resulting in decrease of ISF power\'s growth.</string>
     <string name="dynisf_adjust_sensitivity">Enable TDD based sensitivity ratio for basal and glucose target modification</string>
