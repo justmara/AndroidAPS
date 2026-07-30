@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 @Suppress("ConstPropertyName")
 object Versions {
 
-    const val appVersion = "3.4.2.3"
+    const val appVersion = "3.4.2.4"
 
     // Build label appended to the version number. The version number (appVersion) may change
     // freely (e.g. 3.4.2.1, 3.3.2.0); the label stays constant for this fork.
