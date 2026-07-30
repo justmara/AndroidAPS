@@ -16,7 +16,6 @@ data class ENConfig(
     var OvernightSMBRestrict: Double,
     var IgnoreCOB: Boolean,
     var SafetyMaxBolus: Double,
-    var useISFscaler: Boolean,
     var highBGthreshold: Double,
     var lastHrNetIOB: Double,
     var normalTargetBG: Double,

@@ -23,7 +23,6 @@ import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.absoluteValue
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -385,10 +384,9 @@ class DetermineBasalEN @Inject constructor(
         val isPrebolusing = enConfig.ENWActive == TT.Reason.EATING_NOW_PB && remainingPrebolus > 0.0 && enConfig.ENWRunTime < 10 // if prebolusing
 
         val UAMplusEnabled = enConfig.ENWuamPlusMaxbolus > 0.0
-        val useISFscaler = (enConfig.useISFscaler) // using EN ISF Scaler
 
         val sens =
-            if (dynIsfMode && !useISFscaler) profile.variable_sens
+            if (dynIsfMode) profile.variable_sens
             else {
                 val profile_sens = round(profile.sens, 1)
                 val adjusted_sens = round(profile.sens / sensitivityRatio, 1)
@@ -417,7 +415,7 @@ class DetermineBasalEN @Inject constructor(
 
         // calculate the naive (bolus calculator math) eventual BG based on net IOB and sensitivity
         val naive_eventualBG =
-            if (dynIsfMode || useISFscaler)
+            if (dynIsfMode)
                 round(bg - (iob_data.iob * sens), 0)
             else {
                 if (iob_data.iob > 0) round(bg - (iob_data.iob * sens), 0)
@@ -814,7 +812,7 @@ class DetermineBasalEN @Inject constructor(
         // Dynamic ISF
         var future_sens = profile.variable_sens // start with profile ISF
         val fSensBG = min(minPredBG, bg)
-        if (dynIsfMode && !useISFscaler) {
+        if (dynIsfMode) {
             if (bg > target_bg && glucose_status.delta < 3 && glucose_status.delta > -3 && glucose_status.shortAvgDelta > -3 && glucose_status.shortAvgDelta < 3 && eventualBG > target_bg && eventualBG < bg) {
                 future_sens = round(dynIsfCalculator.getIsfForBg(((fSensBG * 0.5) + (bg * 0.5)), profile.sensNormalTarget, profile.insulinDivisor, false), 1)
                 consoleLog.add("Future state sensitivity is $future_sens based on eventual and current bg due to flat glucose level above target")
@@ -928,30 +926,6 @@ class DetermineBasalEN @Inject constructor(
 
             // Standard AAPS safety: Includes dropping or recovering safety ↘ → ⇊
             else -> min(minPredBG, eventualBG)
-        }
-
-        // ISF Scaling similar to dynamic ISF but using profile target BG ISF as the anchor
-        if (useISFscaler && !isHighTempSet) {
-            // Prevent divide-by-zero or math errors with extremely low BGs
-            val safeBG = max(40.0, insulinReqBG)
-            val insVal = profile.insulinDivisor
-
-            // Apply scaling
-            val sensBGScaler = ln((safeBG / insVal) + 1.0)
-            val sensNormalTargetScaler = ln((target_bg / insVal) + 1.0)
-
-            // Calculate the base ISF from the normal log curve
-            val baseAdaptiveISF = (profile.sens / sensBGScaler) * sensNormalTargetScaler
-
-            // Calculate how much the ISF was supposed to change, then multiply it
-            future_sens = baseAdaptiveISF / isHighScaledPct
-
-            // Prevent the algorithm from giving you too much or too little insulin
-            val minSafeIsf = profile.sens * 0.4
-            val maxSafeIsf = profile.sens * 1.5
-
-            future_sens = future_sens.coerceIn(minSafeIsf, maxSafeIsf)
-            future_sens = round(future_sens, 1)
         }
 
         consoleLog.add("minPredBG: $minPredBG minIOBPredBG: $minIOBPredBG minZTGuardBG: $minZTGuardBG")
@@ -1154,7 +1128,7 @@ class DetermineBasalEN @Inject constructor(
             // calculate 30m low-temp required to get projected BG up to target
             // multiply by 2 to low-temp faster for increased hypo safety
             var insulinReq =
-                if (dynIsfMode || useISFscaler) 2 * min(0.0, (eventualBG - target_bg) / future_sens)
+                if (dynIsfMode) 2 * min(0.0, (eventualBG - target_bg) / future_sens)
                 else 2 * min(0.0, (eventualBG - target_bg) / sens)
             insulinReq = round(insulinReq, 2)
             // calculate naiveInsulinReq based on naive_eventualBG
@@ -1264,7 +1238,7 @@ class DetermineBasalEN @Inject constructor(
 
             val insulinReqOrig = round((min(minPredBG, eventualBG) - target_bg) / sens, 2) // original insulinReq for transparency
 
-            var insulinReq = if (dynIsfMode || useISFscaler) {
+            var insulinReq = if (dynIsfMode) {
                 round((insulinReqBG - target_bg) / future_sens, 2)
             } else {
                 round((insulinReqBG - target_bg) / sens, 2)

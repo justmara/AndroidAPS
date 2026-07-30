@@ -475,10 +475,6 @@ open class ENPlugin @Inject constructor(
 
         val lastHrNetIOB = tddCalculator.calculateIntervalNet(now - T.hours(1).msecs(), now, allowMissingData = true)?.totalAmount ?: 0.0
 
-        // using ISF scaling?
-        val useISFscaler = preferences.get(BooleanKey.EatingNow_UseISFscaler)
-        if (useISFscaler) preferences.put(BooleanKey.DynIsfEnabled,false) // disable DynISF if using ISF scaler
-
         // EN profile scaling within ENW
         val profileCarbRatio = profile.getIc()
         val profileIsf = profileUtil.convertToMgdlDetect(profile.getIsfMgdl("ENPlugin"))
@@ -556,7 +552,6 @@ open class ENPlugin @Inject constructor(
             OvernightSMBRestrict = profileUtil.convertToMgdl(preferences.get(DoubleKey.Eatingnow_overnightSMB), units) + normalTargetBG,
             IgnoreCOB = ignoreCOB,
             SafetyMaxBolus = preferences.get(DoubleKey.SafetyMaxBolus),
-            useISFscaler = useISFscaler,
             highBGthreshold = profileUtil.convertToMgdl(preferences.get(DoubleKey.highBGthreshold), units) + normalTargetBG,
             lastHrNetIOB = Round.roundTo(lastHrNetIOB, 0.01),
             normalTargetBG = normalTargetBG,
@@ -772,7 +767,6 @@ open class ENPlugin @Inject constructor(
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.Eatingnow_overnightSMB, dialogMessage = R.string.eatingnow_overnightSMB_summary, title = R.string.eatingnow_overnightSMB_title))
                 addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.highBGthreshold, dialogMessage = R.string.eatingnow_highBGthreshold_summary, title = R.string.eatingnow_highBGthreshold_title))
                 addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.EatingNow_IgnoreCOB, summary = R.string.EatingNow_IgnoreCOB_summary, title = R.string.EatingNow_IgnoreCOB_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.EatingNow_UseISFscaler, summary = R.string.EatingNow_useISFscaler_summary, title = R.string.EatingNow_useISFscaler_title))
 
             })
 

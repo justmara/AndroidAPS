@@ -370,8 +370,6 @@
     <string name="eatingnow_highBGthreshold_summary">ISF Scaling will increase when BG is stuck above this additional BG offset\ne.g. if normalTarget is 5.5 (99) and this setting is 1.5 (27) ISF scaling will commence at above 7.0 (126)\n0 is disabled</string>
     <string name="EatingNow_IgnoreCOB_title">Ignore COB</string>
     <string name="EatingNow_IgnoreCOB_summary">Ignore COB predictions, useful when entering rescue carbs</string>
-    <string name="EatingNow_useISFscaler_title">ISF Scaling</string>
-    <string name="EatingNow_useISFscaler_summary">Similar to dynISF but uses profile ISF at target bg</string>
     <string name="EatingNow_AutoStart_title">Autostart EN</string>
     <string name="EatingNow_AutoStart_summary">Disable sleep mode and activate Eating Now after the start time</string>
 

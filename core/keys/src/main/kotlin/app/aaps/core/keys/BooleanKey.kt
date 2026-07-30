@@ -157,7 +157,6 @@ enum class BooleanKey(
 
     // Eating Now
     EatingNow_IgnoreCOB("IgnoreCOB", false, defaultedBySM = true, hideParentScreenIfHidden = true),
-    EatingNow_UseISFscaler("UseISFscaler", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     EatingNow_AutoStart("AutostartEN", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     EatingNow_AllowUAMplusNoENW("EatingNow_AllowUAMplusNoENW", false, defaultedBySM = true, hideParentScreenIfHidden = true),
     OverviewShowEnButton("show_en_button", true, defaultedBySM = true),
