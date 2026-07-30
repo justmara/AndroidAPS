@@ -93,7 +93,6 @@ import javax.inject.Provider
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 
@@ -328,23 +327,14 @@ open class OpenAPSBoostPlugin @Inject constructor(
 
     private fun calculateBoostIsf(
         profileSens: Double,
-        profilePercent: Int,
-        targetBg: Double,
         insulinDivisor: Int,
         glucoseValue: Double,
-        isTempTarget: Boolean,
         profile: Profile
     ): BoostIsfResult {
         val autosensMax = preferences.get(DoubleKey.AutosensMax)
         val autosensMin = preferences.get(DoubleKey.AutosensMin)
         val velocity = dynIsfVelocity
         val bgCap = dynIsfBgCap
-        val bgNormalTarget = dynIsfNormalTarget
-        val highTtRaisesSens = preferences.get(BooleanKey.ApsAutoIsfHighTtRaisesSens)
-        val lowTtLowersSens = preferences.get(BooleanKey.ApsAutoIsfLowTtLowersSens)
-        val halfBasalTarget = SMBDefaults.half_basal_exercise_target
-
-        val globalScale = 100.0 / profilePercent.toDouble()
 
         var sensNormalTarget = profileSens
         var ratio = 1.0
@@ -355,82 +345,59 @@ open class OpenAPSBoostPlugin @Inject constructor(
 
         val debug = StringBuilder()
 
-        // TDD-based ISF calculation
-        val useTdd = preferences.get(BooleanKey.DynIsfUseTdd)
-        val adjustSens = preferences.get(BooleanKey.DynIsfAdjustSensitivity)
+        var variableSens = profileSens
 
-        if (useTdd || adjustSens) {
-            val result = dynIsfCalculator.calculate(profile)
-            val tdd7D = result.tdd7D
-            val tddLast24H = result.tddLast24H
+        // Delegate to DynIsfCalculator — handles useTdd/!useTdd + TT adjustment + velocity scaling internally
+        val result = dynIsfCalculator.calculate(profile)
 
-            debug.append("TDD data: 7D=${tdd7D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 1D=${result.tdd1D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 24H=${tddLast24H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 4H=${result.tddLast4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
-            debug.append(" | 8-4H=${result.tddLast8to4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+        debug.append("TDD data: 7D=${result.tdd7D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+        debug.append(" | 1D=${result.tdd1D?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+        debug.append(" | 24H=${result.tddLast24H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+        debug.append(" | 4H=${result.tddLast4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
+        debug.append(" | 8-4H=${result.tddLast8to4H?.let { Round.roundTo(it, 0.1) } ?: "null"}")
 
-            // Log if TDD parts are incomplete — signals fallback to profile ISF
-            if (!result.tddPartsCalculated()) {
-                aapsLogger.debug(LTag.APS, "Boost: TDD parts missing (7D=$tdd7D 1D=${result.tdd1D} 24H=$tddLast24H 4H=${result.tddLast4H} 8-4H=${result.tddLast8to4H})")
-            }
-
-            result.sensNormalTarget?.let { target ->
-                if (!target.isFinite()) {
-                    debug.append("\n⚠ TDD ISF: invalid value ${Round.roundTo(target, 0.1)} — using profile ISF")
-                    aapsLogger.warn(LTag.APS, "Boost TDD ISF: invalid tdd=${result.tdd} (tddPartsCalculated=${result.tddPartsCalculated()}), falling back to profile ISF")
-                } else {
-                    sensNormalTarget = target
-                    tdd = result.tdd ?: 0.0
-                    debug.append("\nTDD ISF at target: ${Round.roundTo(sensNormalTarget, 0.1)} mg/dl/U (profile was ${Round.roundTo(profileSens, 0.1)})")
-                }
-            } ?: run {
-                debug.append("\n⚠ DynISF calculation produced no result — using profile ISF")
-            }
-
-            // Apply TDD autosens ratio (only when !useTdd, DynIsfCalculator handles the logic)
-            if (result.ratio != 1.0) {
-                ratio = result.ratio
-                // sensNormalTarget already includes ratio adjustment from DynIsfCalculator
-                debug.append("\nTDD autosens ratio: ${Round.roundTo(ratio, 0.01)} → ISF=${Round.roundTo(sensNormalTarget, 0.1)}")
-            }
-
-            // ISF shadow — compute the V4.4.2-style EMA(τ=3h) sensitivity ratio
-            // in parallel. Does not modify sensNormalTarget; result is returned
-            // alongside the real BoostIsfResult for direct comparison.
-            if (useTdd && tdd7D != null && tddLast24H != null) {
-                isfShadowResult = boostIsfShadow.computeShadow(
-                    tddLast24H = tddLast24H,
-                    tdd7D = tdd7D,
-                    autosensMin = autosensMin,
-                    autosensMax = autosensMax
-                )
-                if (isfShadowResult != null) {
-                    debug.append("\n${isfShadowResult.debugLine}")
-                }
-            }
-        } else {
-            debug.append("TDD-based ISF: disabled (using profile ISF ${Round.roundTo(profileSens, 0.1)})")
+        // Log if TDD parts are incomplete — signals fallback to profile ISF
+        if (!result.tddPartsCalculated()) {
+            aapsLogger.debug(LTag.APS, "Boost: TDD parts missing (7D=${result.tdd7D} 1D=${result.tdd1D} 24H=${result.tddLast24H} 4H=${result.tddLast4H} 8-4H=${result.tddLast8to4H})")
         }
 
-        // Temp target sensitivity adjustment
-        if (isTempTarget && ((highTtRaisesSens && targetBg > bgNormalTarget) || (lowTtLowersSens && targetBg < bgNormalTarget))) {
-            val c = (halfBasalTarget - bgNormalTarget).toDouble()
-            if (c * (c + targetBg - bgNormalTarget) > 0.0) {
-                ratio = c / (c + targetBg - bgNormalTarget)
-                ratio = max(min(ratio, autosensMax), autosensMin)
-                sensNormalTarget /= ratio
-                debug.append("\nTT adjustment: ratio=${Round.roundTo(ratio, 0.01)} → ISF=${Round.roundTo(sensNormalTarget, 0.1)}")
-                aapsLogger.debug(LTag.APS, "Boost ISF adjusted by ${1.0 / ratio} due to TT of ${targetBg.toInt()}")
+        result.sensNormalTarget?.let { target ->
+            if (!target.isFinite()) {
+                debug.append("\n⚠ TDD ISF: invalid value ${Round.roundTo(target, 0.1)} — using profile ISF")
+                aapsLogger.warn(LTag.APS, "Boost TDD ISF: invalid tdd=${result.tdd} (tddPartsCalculated=${result.tddPartsCalculated()}), falling back to profile ISF")
+            } else {
+                sensNormalTarget = target
+                tdd = result.tdd ?: 0.0
+                variableSens = result.variableSensitivity ?: target
+                debug.append("\nTDD ISF at target: ${Round.roundTo(sensNormalTarget, 0.1)} mg/dl/U (profile was ${Round.roundTo(profileSens, 0.1)})")
+            }
+        } ?: run {
+            debug.append("\n⚠ DynISF calculation produced no result — using profile ISF")
+        }
+
+        // Apply TDD autosens ratio (only when !useTdd, DynIsfCalculator handles the logic)
+        if (result.ratio != 1.0) {
+            ratio = result.ratio
+            // sensNormalTarget already includes ratio adjustment from DynIsfCalculator
+            debug.append("\nTDD autosens ratio: ${Round.roundTo(ratio, 0.01)} → ISF=${Round.roundTo(sensNormalTarget, 0.1)}")
+        }
+
+        // ISF shadow — compute the V4.4.2-style EMA(τ=3h) sensitivity ratio
+        // in parallel. Does not modify sensNormalTarget; result is returned
+        // alongside the real BoostIsfResult for direct comparison.
+        if (preferences.get(BooleanKey.DynIsfUseTdd) && result.tdd7D != null && result.tddLast24H != null) {
+            isfShadowResult = boostIsfShadow.computeShadow(
+                tddLast24H = result.tddLast24H,
+                tdd7D = result.tdd7D,
+                autosensMin = autosensMin,
+                autosensMax = autosensMax
+            )
+            if (isfShadowResult != null) {
+                debug.append("\n${isfShadowResult.debugLine}")
             }
         }
 
-        // Calculate variable_sens using log formula
-        val sbg = ln((bgCurrent / insulinDivisor) + 1.0)
-        val scaler = ln((bgNormalTarget / insulinDivisor) + 1.0) / sbg
-        val variableSens = sensNormalTarget * (1 - (1 - scaler) * velocity)
-
-        debug.append("\nVariable ISF at BG ${Round.roundTo(glucoseValue, 1.0)}: ${Round.roundTo(variableSens, 0.1)} (velocity=${Round.roundTo(velocity * 100, 1.0)}%)")
+        debug.append("\nVariable ISF at BG ${Round.roundTo(glucoseValue, 1.0)}: ${Round.roundTo(variableSens, 0.1)}")
 
         aapsLogger.debug(LTag.APS, "Boost ISF: $debug")
 
@@ -911,11 +878,8 @@ open class OpenAPSBoostPlugin @Inject constructor(
         val scaledProfileSens = profile.getIsfMgdl("OpenAPSBoostPlugin") / profileScale
         val isfResult = calculateBoostIsf(
             profileSens = scaledProfileSens,
-            profilePercent = activityResult.profileSwitch,
-            targetBg = targetBg,
             insulinDivisor = insulinDivisor,
             glucoseValue = glucoseStatus.glucose,
-            isTempTarget = isTempTarget,
             profile = profile
         )
 
@@ -1772,7 +1736,6 @@ open class OpenAPSBoostPlugin @Inject constructor(
         if (requiredKey != null &&
             requiredKey != "absorption_smb_advanced" &&
             requiredKey != "boost_default_aaps_settings" &&
-            requiredKey != "boost_dynisf_settings" &&
             requiredKey != "openapsboost_dynamic_cr_settings" &&
             requiredKey != "boost_exercise_settings" &&
             requiredKey != "boost_stepcount_settings" &&
@@ -1837,47 +1800,34 @@ open class OpenAPSBoostPlugin @Inject constructor(
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostEnableCircadianIsf, summary = R.string.boost_enable_circadian_isf_summary, title = R.string.boost_enable_circadian_isf_title))
             addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsBoostAllowWithHighTt, summary = R.string.boost_allow_high_tt_summary, title = R.string.boost_allow_high_tt_title))
 
-            // ── 3. Dynamic ISF Controls ──────────────────────────────────
+            // ── 3. Dynamic / Auto Carb Ratio ──────────────────────────────────
             addPreference(preferenceManager.createPreferenceScreen(context).apply {
-                key = "boost_dynisf_settings"
-                title = rh.gs(R.string.boost_dynisf_title)
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfUseTdd, summary = R.string.boost_use_tdd_summary, title = R.string.boost_use_tdd_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAdjustSensitivity, summary = R.string.boost_adjust_sensitivity_summary, title = R.string.boost_adjust_sensitivity_title))
-                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.DynIsfAutosensWhenNoTdd, summary = R.string.boost_autosens_when_no_tdd_summary, title = R.string.boost_autosens_when_no_tdd_title))
-                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfNormalTarget, dialogMessage = R.string.boost_dynisf_normal_target_summary, title = R.string.boost_dynisf_normal_target_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfVelocity, dialogMessage = R.string.boost_dynisf_velocity_summary, title = R.string.boost_dynisf_velocity_title))
-                addPreference(AdaptiveUnitPreference(ctx = context, unitKey = UnitDoubleKey.DynIsfBgCap, dialogMessage = R.string.boost_dynisf_bg_cap_summary, title = R.string.boost_dynisf_bg_cap_title))
-                addPreference(AdaptiveIntPreference(ctx = context, intKey = IntKey.DynIsfAdjustmentFactor, dialogMessage = R.string.boost_dynisf_adjust_factor_summary, title = R.string.boost_dynisf_adjust_factor_title))
-                // Dynamic / Auto Carb Ratio (ported from Boost V2) — applies to whichever Boost
-                // plugin is active (V1 or "Boost V6"), since both route dosing through this engine.
-                addPreference(preferenceManager.createPreferenceScreen(context).apply {
-                    key = "openapsboost_dynamic_cr_settings"
-                    title = rh.gs(R.string.dynamic_cr_submenu_title)
-                    addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseDynamicCarbRatio, summary = R.string.pref_summary_aps_use_dynamic_carb_ratio, title = R.string.pref_title_aps_use_dynamic_carb_ratio))
-                    val formulaPref = AdaptiveListIntPreference(
-                        ctx = context, intKey = IntKey.ApsDynamicCrFormula, title = R.string.pref_title_aps_dynamic_cr_formula, summary = R.string.pref_summary_aps_dynamic_cr_formula,
-                        entries = arrayOf<CharSequence>(rh.gs(R.string.dynamic_cr_formula_logarithmic), rh.gs(R.string.dynamic_cr_formula_sigmoid)), entryValues = arrayOf<CharSequence>("0", "1")
-                    )
-                    addPreference(formulaPref)
-                    addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsDynamicCrAdjustmentFactor, dialogMessage = R.string.pref_summary_aps_dynamic_cr_adjustment_factor, title = R.string.pref_title_aps_dynamic_cr_adjustment_factor))
-                    addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsDynamicCrWeightPercentage, dialogMessage = R.string.pref_summary_aps_dynamic_cr_weight_percentage, title = R.string.pref_title_aps_dynamic_cr_weight_percentage))
-                    val customPeakPref = AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsDynamicCrUseCustomPeakTime, summary = R.string.pref_summary_aps_dynamic_cr_use_custom_peak_time, title = R.string.pref_title_aps_dynamic_cr_use_custom_peak_time)
-                    addPreference(customPeakPref)
-                    val peakTimePref = AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsDynamicCrPeakTime, dialogMessage = R.string.pref_summary_aps_dynamic_cr_peak_time, title = R.string.pref_title_aps_dynamic_cr_peak_time)
-                    addPreference(peakTimePref)
-                    addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsAutoCr, summary = R.string.pref_summary_aps_auto_cr, title = R.string.pref_title_aps_auto_cr))
-                    // Insulin peak time only affects the logarithmic formula — hide it (and its child) for sigmoid.
-                    fun applyFormulaVisibility(logarithmic: Boolean) {
-                        val crOn = preferences.get(BooleanKey.ApsUseDynamicCarbRatio)
-                        customPeakPref.isVisible = crOn && logarithmic
-                        peakTimePref.isVisible = crOn && logarithmic && preferences.get(BooleanKey.ApsDynamicCrUseCustomPeakTime)
-                    }
-                    applyFormulaVisibility(preferences.get(IntKey.ApsDynamicCrFormula) == 0)
-                    formulaPref.setOnPreferenceChangeListener { _, newValue ->
-                        applyFormulaVisibility(newValue?.toString() == "0")
-                        true
-                    }
-                })
+                key = "openapsboost_dynamic_cr_settings"
+                title = rh.gs(R.string.dynamic_cr_submenu_title)
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsUseDynamicCarbRatio, summary = R.string.pref_summary_aps_use_dynamic_carb_ratio, title = R.string.pref_title_aps_use_dynamic_carb_ratio))
+                val formulaPref = AdaptiveListIntPreference(
+                    ctx = context, intKey = IntKey.ApsDynamicCrFormula, title = R.string.pref_title_aps_dynamic_cr_formula, summary = R.string.pref_summary_aps_dynamic_cr_formula,
+                    entries = arrayOf<CharSequence>(rh.gs(R.string.dynamic_cr_formula_logarithmic), rh.gs(R.string.dynamic_cr_formula_sigmoid)), entryValues = arrayOf<CharSequence>("0", "1")
+                )
+                addPreference(formulaPref)
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsDynamicCrAdjustmentFactor, dialogMessage = R.string.pref_summary_aps_dynamic_cr_adjustment_factor, title = R.string.pref_title_aps_dynamic_cr_adjustment_factor))
+                addPreference(AdaptiveDoublePreference(ctx = context, doubleKey = DoubleKey.ApsDynamicCrWeightPercentage, dialogMessage = R.string.pref_summary_aps_dynamic_cr_weight_percentage, title = R.string.pref_title_aps_dynamic_cr_weight_percentage))
+                val customPeakPref = AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsDynamicCrUseCustomPeakTime, summary = R.string.pref_summary_aps_dynamic_cr_use_custom_peak_time, title = R.string.pref_title_aps_dynamic_cr_use_custom_peak_time)
+                addPreference(customPeakPref)
+                val peakTimePref = AdaptiveIntPreference(ctx = context, intKey = IntKey.ApsDynamicCrPeakTime, dialogMessage = R.string.pref_summary_aps_dynamic_cr_peak_time, title = R.string.pref_title_aps_dynamic_cr_peak_time)
+                addPreference(peakTimePref)
+                addPreference(AdaptiveSwitchPreference(ctx = context, booleanKey = BooleanKey.ApsAutoCr, summary = R.string.pref_summary_aps_auto_cr, title = R.string.pref_title_aps_auto_cr))
+                // Insulin peak time only affects the logarithmic formula — hide it (and its child) for sigmoid.
+                fun applyFormulaVisibility(logarithmic: Boolean) {
+                    val crOn = preferences.get(BooleanKey.ApsUseDynamicCarbRatio)
+                    customPeakPref.isVisible = crOn && logarithmic
+                    peakTimePref.isVisible = crOn && logarithmic && preferences.get(BooleanKey.ApsDynamicCrUseCustomPeakTime)
+                }
+                applyFormulaVisibility(preferences.get(IntKey.ApsDynamicCrFormula) == 0)
+                formulaPref.setOnPreferenceChangeListener { _, newValue ->
+                    applyFormulaVisibility(newValue?.toString() == "0")
+                    true
+                }
             })
 
             // ── 4. Exercise Settings (parent with nested sub-screens) ────
